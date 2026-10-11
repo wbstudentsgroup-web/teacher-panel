@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="QdWp6KclUO3WdEfBuTkQhXAhnqjiTWrIhc3XT16dT9E">
     <title>WB STG - Teacher Command Center</title>
     <link rel="icon" type="image/png" href="https://i.ibb.co/4ZCcqKJz/wblogo.png">
     
@@ -218,6 +219,9 @@
                             <i class="ph-bold ph-users text-base"></i>
                             <span>Enrolled Students</span>
                         </button>
+                        <button onclick="app.switchStudioTab('presence')" id="tabBtnPresence" class="hidden px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition flex items-center space-x-2 whitespace-nowrap">
+                            <i class="ph-bold ph-activity text-base"></i><span>Live Presence</span>
+                        </button>
                     </div>
                 </div>
 
@@ -289,6 +293,27 @@
                             </table>
                         </div>
                     </div>
+                </div>
+
+                <!-- Live Presence & Active Users -->
+                <div id="studioTabPresence" class="hidden space-y-5">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div><h3 class="text-lg font-bold text-white">Live Presence & Active Users</h3><p class="text-xs text-slate-400">Online users are prioritized, followed by most recent activity.</p></div>
+                        <button onclick="app.loadPresence()" class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
+                    </div>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4"><div class="text-xs text-slate-400">👥 Total Students</div><div id="presenceTotal" class="text-2xl font-bold text-white mt-1">0</div></div>
+                        <div class="bg-slate-900 border border-emerald-500/20 rounded-xl p-4"><div class="text-xs text-emerald-300">🟢 Online Right Now</div><div id="presenceOnline" class="text-2xl font-bold text-white mt-1">0</div></div>
+                        <div class="bg-slate-900 border border-blue-500/20 rounded-xl p-4"><div class="text-xs text-blue-300">📅 Active Today</div><div id="presenceToday" class="text-2xl font-bold text-white mt-1">0</div></div>
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4"><div class="text-xs text-slate-400">⚪ Offline</div><div id="presenceOffline" class="text-2xl font-bold text-white mt-1">0</div></div>
+                    </div>
+                    <div class="flex flex-wrap gap-2" id="presenceFilters">
+                        <button onclick="app.setPresenceFilter('all')" class="presence-filter px-3 py-2 rounded-lg text-xs bg-purple-600 text-white">All Users</button>
+                        <button onclick="app.setPresenceFilter('online')" class="presence-filter px-3 py-2 rounded-lg text-xs bg-slate-800 text-slate-300">🟢 Online Now</button>
+                        <button onclick="app.setPresenceFilter('today')" class="presence-filter px-3 py-2 rounded-lg text-xs bg-slate-800 text-slate-300">📅 Active Today</button>
+                        <button onclick="app.setPresenceFilter('offline')" class="presence-filter px-3 py-2 rounded-lg text-xs bg-slate-800 text-slate-300">⚪ Offline</button>
+                    </div>
+                    <div id="presenceList" class="space-y-2"><div class="p-6 text-center text-slate-500">Load presence to view students.</div></div>
                 </div>
             </div>
         </main>
@@ -504,6 +529,14 @@
         </div>
     </div>
 
+    <!-- Student Inspector Modal -->
+    <div id="modalStudentInspector" class="fixed inset-0 z-[60] hidden items-center justify-center p-4 bg-darkBg/85 backdrop-blur-sm overflow-y-auto">
+        <div class="bg-cardBg w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl p-6 border border-slate-700 shadow-2xl space-y-5 my-6">
+            <div class="flex items-center justify-between"><h3 class="text-lg font-bold text-white">Student Inspector</h3><button onclick="app.closeModal('modalStudentInspector')" class="p-2 rounded-lg bg-slate-800 text-slate-300"><i class="ph-bold ph-x"></i></button></div>
+            <div id="studentInspectorContent" class="space-y-4"></div>
+        </div>
+    </div>
+
     <!-- MAIN APP SCRIPT -->
     <script>
         // Exact Firebase Configuration
@@ -530,6 +563,11 @@
                 this.currentCourseId = null;
                 this.enrolledStudents = [];
                 this.courseTests = [];
+                this.teacherStatusUnsubscribe = null;
+                this.presenceUnsubscribe = null;
+                this.allPresenceUsers = [];
+                this.presenceFilter = 'all';
+                this.inspectedStudentId = null;
                 this.init();
             }
 
@@ -554,7 +592,7 @@
                         const parsed = JSON.parse(savedSession);
                         // One-time migration: older portal builds treated missing permission
                         // fields as false. Re-login so the current Firestore record is re-read.
-                        if (parsed.permissionDefaultsVersion !== 2) {
+                        if (parsed.permissionDefaultsVersion !== 3) {
                             localStorage.removeItem('wb_teacher_session');
                         } else {
                             this.teacher = parsed;
@@ -598,6 +636,7 @@
 
                     let teacherDoc = null;
                     let teacherData = null;
+                    let teacherCollection = 'sub_admins';
                     const lookupErrors = [];
 
                     // 1. Exact document ID equal to the normalized email.
@@ -629,9 +668,10 @@
                             if (directSnap.exists) {
                                 teacherDoc = directSnap;
                                 teacherData = directSnap.data();
+                                teacherCollection = 'teachers';
                             } else {
                                 const querySnap = await db.collection('teachers').where('email', '==', cleanEmail).get();
-                                if (!querySnap.empty) { teacherDoc = querySnap.docs[0]; teacherData = teacherDoc.data(); }
+                                if (!querySnap.empty) { teacherDoc = querySnap.docs[0]; teacherData = teacherDoc.data(); teacherCollection = 'teachers'; }
                             }
                         } catch (err) { lookupErrors.push(err); console.warn('Teachers collection fallback error:', err); }
                     }
@@ -652,14 +692,15 @@
                         return;
                     }
 
-                    if (String(teacherData.status || '').toLowerCase() === 'suspended') {
-                        Swal.fire({ ...alertOptions, icon: 'warning', title: 'Access Suspended', text: 'Your teacher account has been suspended by the administrator.' });
+                    if (String(teacherData.status || '').toLowerCase() !== 'active') {
+                        Swal.fire({ ...alertOptions, icon: 'warning', title: 'Access Denied', text: 'Access Denied: Your teacher account has been suspended by the Admin. Please contact WB STG Administration.' });
                         return;
                     }
 
-                    // Keep the session key consistent with this portal and normalize permission flags.
+                    // Keep source collection/document reference so a live listener can revoke this session.
                     this.teacher = {
                         id: teacherDoc.id,
+                        authCollection: teacherCollection,
                         ...teacherData,
                         email: teacherData.email || cleanEmail,
                         name: teacherData.name || 'Faculty Member',
@@ -672,9 +713,13 @@
                         canAddLectures: teacherData.canAddLectures !== false,
                         canAddNotes: teacherData.canAddNotes !== false,
                         canManageTests: teacherData.canManageTests !== false,
-                        canViewStudents: teacherData.canViewStudents !== false,
-                        canPostNotices: teacherData.canPostNotices !== false,
-                        permissionDefaultsVersion: 2
+                        canViewStudents: teacherData.canViewStudents === true,
+                        canViewPresence: teacherData.canViewPresence === true,
+                        canInspectUsers: teacherData.canInspectUsers === true,
+                        canBlockUsers: teacherData.canBlockUsers === true,
+                        canGrantPremium: teacherData.canGrantPremium === true,
+                        canPostNotices: teacherData.canPostNotices === true,
+                        permissionDefaultsVersion: 3
                     };
                     localStorage.setItem('wb_teacher_session', JSON.stringify(this.teacher));
                     this.enterDashboard();
@@ -708,7 +753,9 @@
                     const tabStudents = document.getElementById('tabBtnStudents');
                     if (tabStudents) tabStudents.style.display = 'none';
                 }
-
+                const presenceTab = document.getElementById('tabBtnPresence');
+                if (presenceTab) presenceTab.classList.toggle('hidden', this.teacher.canViewPresence !== true);
+                this.watchTeacherStatus();
                 this.loadCourses();
             }
 
@@ -725,6 +772,8 @@
                     confirmButtonText: 'Yes, Logout'
                 }).then((result) => {
                     if (result.isConfirmed) {
+                        if (this.teacherStatusUnsubscribe) this.teacherStatusUnsubscribe();
+                        if (this.presenceUnsubscribe) this.presenceUnsubscribe();
                         localStorage.removeItem('wb_teacher_session');
                         location.reload();
                     }
@@ -907,18 +956,20 @@
                 const btnContent = document.getElementById('tabBtnContent');
                 const btnTests = document.getElementById('tabBtnTests');
                 const btnStudents = document.getElementById('tabBtnStudents');
+                const btnPresence = document.getElementById('tabBtnPresence');
 
                 const tabContent = document.getElementById('studioTabContent');
                 const tabTests = document.getElementById('studioTabTests');
                 const tabStudents = document.getElementById('studioTabStudents');
+                const tabPresence = document.getElementById('studioTabPresence');
 
                 // Reset tabs
-                [btnContent, btnTests, btnStudents].forEach(b => {
+                [btnContent, btnTests, btnStudents, btnPresence].forEach(b => {
                     if (b) {
                         b.className = "px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition flex items-center space-x-2 whitespace-nowrap";
                     }
                 });
-                [tabContent, tabTests, tabStudents].forEach(t => {
+                [tabContent, tabTests, tabStudents, tabPresence].forEach(t => {
                     if (t) t.classList.add('hidden');
                 });
 
@@ -931,9 +982,15 @@
                     if (tabTests) tabTests.classList.remove('hidden');
                     this.loadCourseTests();
                 } else if (tabName === 'students') {
+                    if (!this.teacher.canViewStudents) return this.denied();
                     if (btnStudents) btnStudents.className = "px-4 py-2 bg-purple-600 text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center space-x-2 whitespace-nowrap";
                     if (tabStudents) tabStudents.classList.remove('hidden');
                     this.loadEnrolledStudents();
+                } else if (tabName === 'presence') {
+                    if (this.teacher.canViewPresence !== true) return this.denied();
+                    if (btnPresence) btnPresence.className = "px-4 py-2 bg-purple-600 text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center space-x-2 whitespace-nowrap";
+                    if (tabPresence) tabPresence.classList.remove('hidden');
+                    this.loadPresence();
                 }
             }
 
@@ -1168,6 +1225,7 @@
 
             async deleteLecture(sIdx, cIdx, lIdx) {
                 if (!this.teacher.canAddLectures) return this.denied();
+                if (!(await this.assertSessionActive())) return;
                 const ok = await Swal.fire({title:'Delete lecture?',text:'This removes the lecture from this chapter.',icon:'warning',showCancelButton:true,confirmButtonText:'Delete',confirmButtonColor:'#dc2626',background:'#0f172a',color:'#fff'});
                 if (!ok.isConfirmed) return;
                 this.currentCourse.subjects[sIdx].chapters[cIdx].lectures.splice(lIdx,1);
@@ -1176,6 +1234,7 @@
 
             async deleteMaterial(sIdx, cIdx, mIdx) {
                 if (!this.teacher.canAddNotes) return this.denied();
+                if (!(await this.assertSessionActive())) return;
                 const ok = await Swal.fire({title:'Delete study material?',text:'This removes the PDF note from this chapter.',icon:'warning',showCancelButton:true,confirmButtonText:'Delete',confirmButtonColor:'#dc2626',background:'#0f172a',color:'#fff'});
                 if (!ok.isConfirmed) return;
                 this.currentCourse.subjects[sIdx].chapters[cIdx].materials.splice(mIdx,1);
@@ -1193,6 +1252,8 @@
 
             async saveSubject(e) {
                 e.preventDefault();
+                if (!this.teacher.canAddLectures) return this.denied();
+                if (!(await this.assertSessionActive())) return;
                 const title = document.getElementById('newSubjectTitle').value.trim();
                 const desc = document.getElementById('newSubjectDesc').value.trim();
 
@@ -1203,14 +1264,15 @@
                     chapters: []
                 });
 
-                await this.updateCourseInFirestore();
-                this.closeModal('modalAddSubject');
-                this.renderSubjectsAccordion();
-                Swal.fire({ icon: 'success', title: 'Subject Added', text: 'New subject added successfully.', background: '#0f172a', color: '#fff', timer: 1500, showConfirmButton: false });
+                if (await this.updateCourseInFirestore()) {
+                    this.closeModal('modalAddSubject'); this.renderSubjectsAccordion(); this.toast('Subject added');
+                }
             }
 
             async saveChapter(e) {
                 e.preventDefault();
+                if (!this.teacher.canAddLectures) return this.denied();
+                if (!(await this.assertSessionActive())) return;
                 const sIdx = parseInt(document.getElementById('chapterSubjectIdx').value);
                 const title = document.getElementById('newChapterTitle').value.trim();
 
@@ -1223,15 +1285,15 @@
                     materials: []
                 });
 
-                await this.updateCourseInFirestore();
-                this.closeModal('modalAddChapter');
-                this.renderSubjectsAccordion();
-                Swal.fire({ icon: 'success', title: 'Chapter Added', text: 'New chapter added successfully.', background: '#0f172a', color: '#fff', timer: 1500, showConfirmButton: false });
+                if (await this.updateCourseInFirestore()) {
+                    this.closeModal('modalAddChapter'); this.renderSubjectsAccordion(); this.toast('Chapter added');
+                }
             }
 
             async saveLecture(e) {
                 e.preventDefault();
                 if (!this.teacher.canAddLectures) return this.denied();
+                if (!(await this.assertSessionActive())) return;
                 const sIdx = Number(document.getElementById('lecSubjectIdx').value);
                 const cIdx = Number(document.getElementById('lecChapterIdx').value);
                 const lIdx = Number(document.getElementById('lecEditIdx').value);
@@ -1267,6 +1329,7 @@
             async saveMaterial(e) {
                 e.preventDefault();
                 if (!this.teacher.canAddNotes) return this.denied();
+                if (!(await this.assertSessionActive())) return;
                 const sIdx = Number(document.getElementById('matSubjectIdx').value);
                 const cIdx = Number(document.getElementById('matChapterIdx').value);
                 const mIdx = Number(document.getElementById('matEditIdx').value);
@@ -1287,6 +1350,7 @@
             }
 
             async updateCourseInFirestore() {
+                if (!(await this.assertSessionActive())) return false;
                 try {
                     await db.collection('courses').doc(this.currentCourseId).update({
                         subjects: this.currentCourse.subjects
@@ -1333,6 +1397,7 @@
 
             async deleteTest(testId) {
                 if (!this.teacher.canManageTests) return this.denied();
+                if (!(await this.assertSessionActive())) return;
                 const ok = await Swal.fire({title:'Delete test?',text:'This assessment will be permanently removed.',icon:'warning',showCancelButton:true,confirmButtonText:'Delete',confirmButtonColor:'#dc2626',background:'#0f172a',color:'#fff'});
                 if (!ok.isConfirmed) return;
                 try {
@@ -1389,6 +1454,7 @@
             async saveTest(e) {
                 e.preventDefault();
                 if (!this.teacher.canManageTests) return this.denied();
+                if (!(await this.assertSessionActive())) return;
                 const title = document.getElementById('testTitle').value.trim();
                 const duration = parseInt(document.getElementById('testDuration').value,10);
                 const totalMarks = parseInt(document.getElementById('testTotalMarks').value,10);
@@ -1493,6 +1559,196 @@
                 this.renderStudents(this.enrolledStudents.filter(s => [s.name,s.email,s.phone,s.phoneNumber].some(v => String(v || '').toLowerCase().includes(q))));
             }
 
+            async assertSessionActive() {
+                if (!this.teacher || !this.teacher.id) return false;
+                try {
+                    const collection = this.teacher.authCollection || 'sub_admins';
+                    let snap = await db.collection(collection).doc(this.teacher.id).get();
+                    if (!snap.exists && collection !== 'sub_admins') {
+                        const q = await db.collection('sub_admins').where('email', '==', String(this.teacher.email || '').toLowerCase()).limit(1).get();
+                        if (!q.empty) snap = q.docs[0];
+                    }
+                    if (!snap.exists || String((snap.data() || {}).status || '').toLowerCase() !== 'active') {
+                        this.revokeSession('Your access has been revoked or suspended by WB STG Administration.');
+                        return false;
+                    }
+                    if (collection !== 'sub_admins') {
+                        const adminSnap = await db.collection('sub_admins').where('email', '==', String(this.teacher.email || '').toLowerCase()).limit(1).get();
+                        if (!adminSnap.empty && String((adminSnap.docs[0].data() || {}).status || '').toLowerCase() !== 'active') {
+                            this.revokeSession('Your access has been revoked or suspended by WB STG Administration.'); return false;
+                        }
+                    }
+                    return true;
+                } catch (err) {
+                    console.error('Teacher status check failed:', err);
+                    Swal.fire({icon:'error',title:'Unable to verify access',text:'Your account status could not be verified. Please reconnect and sign in again before editing content.',background:'#0f172a',color:'#fff'});
+                    return false;
+                }
+            }
+
+            watchTeacherStatus() {
+                if (this.teacherStatusUnsubscribe) this.teacherStatusUnsubscribe();
+                if (!this.teacher || !this.teacher.id) return;
+                const collection = this.teacher.authCollection || 'sub_admins';
+                this.teacherStatusUnsubscribe = db.collection(collection).doc(this.teacher.id).onSnapshot(snap => {
+                    if (!snap.exists || String((snap.data() || {}).status || '').toLowerCase() !== 'active') {
+                        this.revokeSession('Access Denied: your teacher account has been suspended or revoked by the Admin.');
+                    }
+                }, err => console.error('Teacher status listener error:', err));
+                // Also watch the master-admin sub_admins record when legacy teachers collection was used.
+                if (collection !== 'sub_admins') {
+                    db.collection('sub_admins').where('email', '==', String(this.teacher.email || '').toLowerCase()).limit(1).onSnapshot(q => {
+                        if (q.empty || String((q.docs[0].data() || {}).status || '').toLowerCase() !== 'active') this.revokeSession('Access Denied: your teacher account has been suspended or revoked by the Admin.');
+                    }, err => console.warn('Master admin status listener:', err));
+                }
+            }
+
+            revokeSession(message) {
+                if (!this.teacher) return;
+                if (this.teacherStatusUnsubscribe) { this.teacherStatusUnsubscribe(); this.teacherStatusUnsubscribe = null; }
+                if (this.presenceUnsubscribe) { this.presenceUnsubscribe(); this.presenceUnsubscribe = null; }
+                this.teacher = null;
+                localStorage.removeItem('wb_teacher_session');
+                document.getElementById('appContainer').classList.add('hidden');
+                document.getElementById('loginScreen').classList.remove('hidden');
+                Swal.fire({icon:'warning',title:'Access Revoked',text:message,background:'#0f172a',color:'#fff',confirmButtonColor:'#8b5cf6'});
+            }
+
+            timestampMs(value) {
+                if (!value) return 0;
+                if (typeof value.toMillis === 'function') return value.toMillis();
+                if (typeof value.toDate === 'function') return value.toDate().getTime();
+                if (typeof value === 'number') return value < 1e12 ? value * 1000 : value;
+                const parsed = new Date(value).getTime(); return Number.isFinite(parsed) ? parsed : 0;
+            }
+
+            friendlyTime(value) {
+                const ms = this.timestampMs(value); if (!ms) return 'Unknown';
+                const delta = Date.now() - ms;
+                if (delta < 60000) return 'Active Now';
+                if (delta < 3600000) return Math.floor(delta / 60000) + ' mins ago';
+                const d = new Date(ms);
+                if (d.toDateString() === new Date().toDateString()) return 'Today at ' + d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+                return d.toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+            }
+
+            async loadPresence() {
+                if (this.teacher.canViewPresence !== true) return this.denied();
+                const box = document.getElementById('presenceList');
+                box.innerHTML = '<div class="p-6 text-center text-slate-400">Loading live presence…</div>';
+                try {
+                    const snap = await db.collection('users').get();
+                    this.allPresenceUsers = snap.docs.map(d => ({id:d.id,...d.data()}));
+                    this.updatePresenceStats(); this.renderPresence();
+                    if (this.presenceUnsubscribe) this.presenceUnsubscribe();
+                    this.presenceUnsubscribe = db.collection('users').onSnapshot(s => {
+                        this.allPresenceUsers = s.docs.map(d => ({id:d.id,...d.data()})); this.updatePresenceStats(); this.renderPresence();
+                    }, e => console.warn('Presence listener:', e));
+                } catch (e) { box.innerHTML = `<div class="p-6 text-center text-red-300">Could not load presence: ${this.escapeHtml(e.message)}</div>`; }
+            }
+
+            presenceState(u) {
+                const last = this.timestampMs(u.lastSeen || u.lastActive || u.lastActivity || u.updatedAt);
+                const online = u.online === true || (last > 0 && Date.now() - last < 180000);
+                const start = new Date(); start.setHours(0,0,0,0);
+                const today = u.online === true || (last >= start.getTime());
+                return {online,today,last};
+            }
+
+            updatePresenceStats() {
+                const users = this.allPresenceUsers || []; const states = users.map(u => this.presenceState(u));
+                document.getElementById('presenceTotal').textContent = users.length;
+                document.getElementById('presenceOnline').textContent = states.filter(s=>s.online).length;
+                document.getElementById('presenceToday').textContent = states.filter(s=>s.today).length;
+                document.getElementById('presenceOffline').textContent = users.length - states.filter(s=>s.online).length;
+            }
+
+            setPresenceFilter(filter) {
+                this.presenceFilter = filter;
+                document.querySelectorAll('.presence-filter').forEach(b => { b.className = 'presence-filter px-3 py-2 rounded-lg text-xs bg-slate-800 text-slate-300'; });
+                const active = [...document.querySelectorAll('.presence-filter')].find(b => ({'All Users':'all','🟢 Online Now':'online','📅 Active Today':'today','⚪ Offline':'offline'}[b.textContent.trim()] === filter));
+                if (active) active.className = 'presence-filter px-3 py-2 rounded-lg text-xs bg-purple-600 text-white';
+                this.renderPresence();
+            }
+
+            renderPresence() {
+                const box = document.getElementById('presenceList'); if (!box) return;
+                let users = (this.allPresenceUsers || []).map(u => ({...u,_state:this.presenceState(u)}));
+                users.sort((a,b) => Number(b._state.online)-Number(a._state.online) || b._state.last-a._state.last);
+                if (this.presenceFilter === 'online') users = users.filter(u=>u._state.online);
+                if (this.presenceFilter === 'today') users = users.filter(u=>u._state.today);
+                if (this.presenceFilter === 'offline') users = users.filter(u=>!u._state.online);
+                if (!users.length) { box.innerHTML = '<div class="p-6 text-center text-slate-500 bg-slate-900 rounded-xl">No users match this filter.</div>'; return; }
+                box.innerHTML = users.map(u => `<div class="flex flex-col md:flex-row md:items-center gap-3 p-4 bg-slate-900/80 border border-slate-800 rounded-xl">
+                    <div class="w-10 h-10 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center text-white font-bold">${u.photoURL || u.photoUrl || u.avatar ? `<img class="w-full h-full object-cover" src="${this.safeUrl(u.photoURL || u.photoUrl || u.avatar)}" alt="">` : this.escapeHtml((u.name||u.fullName||'S').charAt(0).toUpperCase())}</div>
+                    <div class="flex-1 min-w-0"><div class="font-semibold text-white">${this.escapeHtml(u.name || u.fullName || 'Student')} <span class="ml-2 text-[10px] ${u._state.online?'text-emerald-300':'text-slate-400'}">● ${u._state.online?'ONLINE':'OFFLINE'}</span></div><div class="text-xs text-slate-400 break-all">${this.escapeHtml(u.email || '')} · ${this.escapeHtml(this.friendlyTime(u.lastSeen || u.lastActive || u.lastActivity || u.updatedAt))}</div></div>
+                    <div class="flex flex-wrap gap-2">${this.teacher.canInspectUsers===true?`<button onclick="app.inspectStudent('${u.id}')" class="px-3 py-2 text-xs rounded-lg bg-blue-600/15 text-blue-300 border border-blue-500/20">🔍 Inspect Profile</button>`:''}${this.teacher.canBlockUsers===true?`<button onclick="app.toggleStudentBlock('${u.id}')" class="px-3 py-2 text-xs rounded-lg ${u.blocked?'bg-emerald-600/15 text-emerald-300':'bg-red-600/15 text-red-300'} border border-slate-700">${u.blocked?'🟢 Unblock Student':'🚫 Block Student'}</button>`:''}</div>
+                </div>`).join('');
+            }
+
+            async inspectStudent(userId) {
+                if (this.teacher.canInspectUsers !== true) return this.denied();
+                const student = this.allPresenceUsers.find(u=>u.id===userId) || this.enrolledStudents.find(u=>u.id===userId);
+                let u = student;
+                if (!u) { const snap = await db.collection('users').doc(userId).get(); if (!snap.exists) return; u={id:userId,...snap.data()}; }
+                this.inspectedStudentId = userId;
+                const batches = Array.isArray(u.enrolledBatches) ? u.enrolledBatches : [];
+                const batchTags = batches.map(id => { const c=this.courses.find(x=>x.id===id); return `<span class="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-200 text-xs">${this.escapeHtml(c?.title || id)}${this.teacher.canGrantPremium===true?`<button onclick="app.removeBatchAccess('${userId}','${id}')" class="text-red-300" title="Remove batch">×</button>`:''}</span>`; }).join('');
+                const grant = this.teacher.canGrantPremium===true ? `<div class="flex flex-col sm:flex-row gap-2 pt-2"><select id="inspectorBatchSelect" class="flex-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white">${this.courses.map(c=>`<option value="${c.id}">${this.escapeHtml(c.title||c.id)}</option>`).join('')}</select><button onclick="app.grantBatchAccess('${userId}')" class="px-3 py-2 bg-emerald-600/20 border border-emerald-500/30 rounded-lg text-emerald-200 text-xs">Grant Access</button></div>` : '';
+                const block = this.teacher.canBlockUsers===true ? `<button onclick="app.toggleStudentBlock('${userId}')" class="px-3 py-2 rounded-lg ${u.blocked?'bg-emerald-600/15 text-emerald-300':'bg-red-600/15 text-red-300'} border border-slate-700 text-xs">${u.blocked?'🟢 Unblock Student':'🚫 Block Student'}</button>` : '';
+                const created = u.createdAt || u.registeredAt;
+                document.getElementById('studentInspectorContent').innerHTML = `<div class="flex items-center gap-4"><div class="w-16 h-16 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center text-xl font-bold">${u.photoURL||u.photoUrl||u.avatar?`<img class="w-full h-full object-cover" src="${this.safeUrl(u.photoURL||u.photoUrl||u.avatar)}" alt="">`:this.escapeHtml((u.name||u.fullName||'S').charAt(0).toUpperCase())}</div><div><h4 class="text-xl font-bold text-white">${this.escapeHtml(u.name||u.fullName||'Student')}</h4><p class="text-sm text-slate-400 break-all">${this.escapeHtml(u.email||'No email')}</p><p class="text-sm text-slate-400">WhatsApp: ${this.escapeHtml(u.phone||u.phoneNumber||u.whatsapp||'Not provided')}</p></div></div>
+                    <div class="grid sm:grid-cols-2 gap-3"><div class="p-3 rounded-xl bg-slate-900"><div class="text-xs text-slate-400">Registered</div><div class="text-sm text-white mt-1">${this.escapeHtml(this.friendlyTime(created))}</div></div><div class="p-3 rounded-xl bg-slate-900"><div class="text-xs text-slate-400">Last Seen</div><div class="text-sm text-white mt-1">${this.escapeHtml(this.friendlyTime(u.lastSeen||u.lastActive||u.lastActivity))}</div></div><div class="p-3 rounded-xl bg-slate-900"><div class="text-xs text-slate-400">Account Status</div><div class="text-sm ${u.blocked?'text-red-300':'text-emerald-300'} mt-1">${u.blocked?'🔴 Blocked':'🟢 Active'}${u.blocked&&u.blockedReason?' · '+this.escapeHtml(u.blockedReason):''}</div></div></div>
+                    <div><h5 class="font-semibold text-white mb-2">Enrolled Course Batches</h5><div class="flex flex-wrap gap-2">${batchTags||'<span class="text-sm text-slate-500">No enrolled batches</span>'}</div>${grant}</div><div class="flex flex-wrap gap-2">${block}</div>`;
+                this.openModal('modalStudentInspector');
+            }
+
+            async toggleStudentBlock(userId) {
+                if (this.teacher.canBlockUsers !== true) return this.denied();
+                if (!(await this.assertSessionActive())) return;
+                const snap = await db.collection('users').doc(userId).get(); if (!snap.exists) return;
+                const user = snap.data() || {}; let blocked = user.blocked === true; let reason = '';
+                if (!blocked) {
+                    const ask = await Swal.fire({title:'Block student?',input:'text',inputLabel:'Brief reason',inputPlaceholder:'Misbehavior / Rule Violation',showCancelButton:true,confirmButtonText:'Block Student',confirmButtonColor:'#dc2626',background:'#0f172a',color:'#fff'});
+                    if (!ask.isConfirmed) return; reason = String(ask.value||'').trim(); if (!reason) return Swal.fire({icon:'warning',title:'Reason required',text:'Enter a brief reason to block this student.',background:'#0f172a',color:'#fff'});
+                    await db.collection('users').doc(userId).set({blocked:true,blockedReason:reason},{merge:true});
+                } else {
+                    const ok = await Swal.fire({title:'Unblock student?',showCancelButton:true,confirmButtonText:'Unblock',background:'#0f172a',color:'#fff'}); if (!ok.isConfirmed) return;
+                    await db.collection('users').doc(userId).set({blocked:false,blockedReason:''},{merge:true});
+                }
+                this.toast(blocked?'Student unblocked':'Student blocked'); await this.loadEnrolledStudents();
+                if (this.teacher.canViewPresence===true && !document.getElementById('studioTabPresence').classList.contains('hidden')) await this.loadPresence();
+                if (this.inspectedStudentId===userId) await this.inspectStudent(userId);
+            }
+
+            async grantBatchAccess(userId) {
+                if (this.teacher.canGrantPremium !== true) return this.denied();
+                if (!(await this.assertSessionActive())) return;
+                const select = document.getElementById('inspectorBatchSelect'); const batchId = select?.value;
+                if (!batchId || !this.courses.some(c=>c.id===batchId)) return this.denied();
+                try {
+                    await db.collection('users').doc(userId).update({enrolledBatches:firebase.firestore.FieldValue.arrayUnion(batchId),allowedCourses:firebase.firestore.FieldValue.arrayUnion(batchId)});
+                    this.toast('Batch access granted'); await this.refreshStudentData(userId);
+                } catch(e) { Swal.fire({icon:'error',title:'Grant failed',text:e.message,background:'#0f172a',color:'#fff'}); }
+            }
+
+            async removeBatchAccess(userId,batchId) {
+                if (this.teacher.canGrantPremium !== true) return this.denied();
+                if (!(await this.assertSessionActive())) return;
+                const ok=await Swal.fire({title:'Remove batch access?',text:'The student will be removed from this batch.',showCancelButton:true,confirmButtonText:'Remove',confirmButtonColor:'#dc2626',background:'#0f172a',color:'#fff'}); if(!ok.isConfirmed)return;
+                try { await db.collection('users').doc(userId).update({enrolledBatches:firebase.firestore.FieldValue.arrayRemove(batchId),allowedCourses:firebase.firestore.FieldValue.arrayRemove(batchId)}); this.toast('Batch access removed'); await this.refreshStudentData(userId); }
+                catch(e){Swal.fire({icon:'error',title:'Remove failed',text:e.message,background:'#0f172a',color:'#fff'});}
+            }
+
+            async refreshStudentData(userId) {
+                const snap=await db.collection('users').doc(userId).get(); if(!snap.exists)return;
+                const u={id:userId,...snap.data()};
+                this.enrolledStudents=this.enrolledStudents.map(x=>x.id===userId?u:x);
+                this.allPresenceUsers=this.allPresenceUsers.map(x=>x.id===userId?u:x);
+                this.renderStudents(this.enrolledStudents); this.updatePresenceStats(); this.renderPresence();
+                await this.inspectStudent(userId);
+            }
+
             renderStudents(list) {
                 const tbody = document.getElementById('studentsTableBody');
                 if (!list.length) {
@@ -1509,12 +1765,11 @@
                             </td>
                             <td class="p-4 text-slate-300">${s.email || 'N/A'}</td>
                             <td class="p-4 text-slate-300">${s.phone || s.phoneNumber || 'N/A'}</td>
-                            <td class="p-4 text-right">
-                                <a href="tel:${s.phone || s.phoneNumber || ''}" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white rounded-lg transition text-xs border border-purple-500/30">
-                                    <i class="ph-bold ph-phone"></i>
-                                    <span>Call</span>
-                                </a>
-                            </td>
+                            <td class="p-4 text-right"><div class="flex flex-wrap justify-end gap-1.5">
+                                <a href="tel:${this.escapeHtml(s.phone || s.phoneNumber || '')}" class="px-2.5 py-1.5 bg-purple-600/20 text-purple-300 rounded-lg text-xs border border-purple-500/30">Call</a>
+                                ${this.teacher.canInspectUsers === true ? `<button onclick="app.inspectStudent('${s.id}')" class="px-2.5 py-1.5 bg-blue-600/15 text-blue-300 rounded-lg text-xs border border-blue-500/20">🔍 Inspect Profile</button>` : ''}
+                                ${this.teacher.canBlockUsers === true ? `<button onclick="app.toggleStudentBlock('${s.id}')" class="px-2.5 py-1.5 ${s.blocked ? 'bg-emerald-600/15 text-emerald-300 border-emerald-500/20' : 'bg-red-600/15 text-red-300 border-red-500/20'} rounded-lg text-xs border">${s.blocked ? '🟢 Unblock' : '🚫 Block'}</button>` : ''}
+                            </div></td>
                         </tr>
                     `).join('');
 
