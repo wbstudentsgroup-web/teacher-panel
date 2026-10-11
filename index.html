@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WB STG - Teacher Command Center</title>
+    <link rel="icon" type="image/png" href="https://i.ibb.co/4ZCcqKJz/wblogo.png">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#020617',
+                        cardBg: '#0f172a',
+                        cardHover: '#1e293b',
+                        accentPurple: '#8b5cf6',
+                        accentEmerald: '#10b981',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Phosphor Icons v2.1.1 Bold -->
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- Firebase SDK v8 -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+        .glass-card { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(139, 92, 246, 0.2); }
+    </style>
+</head>
+<body class="bg-darkBg text-slate-100 min-h-screen selection:bg-purple-500 selection:text-white flex flex-col justify-between">
+
+    <!-- LOGIN SCREEN -->
+    <div id="loginScreen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-darkBg overflow-y-auto">
+        <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-950/40 via-darkBg to-darkBg pointer-events-none"></div>
+        <div class="relative w-full max-w-md glass-card rounded-2xl p-8 shadow-2xl border border-purple-500/20">
+            <div class="text-center mb-8">
+                <div class="inline-flex p-2 bg-white rounded-2xl mb-4 border border-purple-500/30 shadow-lg">
+                    <img src="https://i.ibb.co/4ZCcqKJz/wblogo.png" alt="WB STG Logo" class="w-20 h-20 object-contain">
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight text-white">WB STG - Teacher Command Center</h1>
+                <p class="text-sm text-slate-400 mt-1">Educator & Faculty Command Center</p>
+            </div>
+
+            <form id="loginForm" class="space-y-5" onsubmit="app.handleLogin(event)">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Teacher Email Address</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
+                            <i class="ph-bold ph-envelope text-lg"></i>
+                        </span>
+                        <input type="email" id="loginEmail" required placeholder="teacher@wbstg.com" 
+                            class="w-full pl-10 pr-4 py-3 bg-slate-900/90 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-white">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Password / PIN</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
+                            <i class="ph-bold ph-lock-key text-lg"></i>
+                        </span>
+                        <input type="password" id="loginPassword" required placeholder="••••••••" 
+                            class="w-full pl-10 pr-10 py-3 bg-slate-900/90 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-white">
+                        <button type="button" id="togglePasswordBtn" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200">
+                            <i class="ph-bold ph-eye text-lg" id="togglePasswordIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" id="loginSubmitBtn" class="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold rounded-xl shadow-lg shadow-purple-600/30 transition flex items-center justify-center space-x-2">
+                    <span>Secure Sign In</span>
+                    <i class="ph-bold ph-arrow-right"></i>
+                </button>
+            </form>
+
+            <div class="mt-6 text-center text-xs text-slate-500">
+                Authorized Faculty Access Only • WB STG Academy
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div id="appContainer" class="hidden flex-1 flex flex-col min-h-screen">
+        <!-- HEADER -->
+        <header class="sticky top-0 z-40 bg-cardBg/90 backdrop-blur-md border-b border-slate-800/80 px-4 lg:px-8 py-3.5">
+            <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <!-- Brand & Logo -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3 cursor-pointer" onclick="app.showDashboard()">
+                        <div class="p-1.5 bg-white rounded-xl shadow-md shadow-purple-900/30">
+                            <img src="https://i.ibb.co/4ZCcqKJz/wblogo.png" alt="WB STG Logo" class="w-10 h-10 object-contain">
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="font-bold text-base text-white tracking-tight">WB STG - Teacher Command Center</span>
+                                <span class="px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 text-[10px] font-medium rounded-full">v8 Live</span>
+                            </div>
+                            <p class="text-xs text-slate-400">Educator Command Center</p>
+                        </div>
+                    </div>
+                    <button onclick="app.logout()" class="md:hidden p-2 bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 rounded-xl transition border border-slate-700">
+                        <i class="ph-bold ph-sign-out text-lg"></i>
+                    </button>
+                </div>
+
+                <!-- Teacher Profile & Quick Stats -->
+                <div class="flex items-center justify-between md:justify-end gap-3 flex-wrap">
+                    <div class="flex items-center space-x-3 bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800">
+                        <div class="w-9 h-9 rounded-lg bg-purple-600/20 text-purple-400 flex items-center justify-center font-bold text-sm border border-purple-500/30" id="teacherAvatarInitial">T</div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="font-semibold text-sm text-white" id="headerTeacherName">Loading...</span>
+                                <span class="inline-flex items-center space-x-1 px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-medium rounded-full border border-emerald-500/20">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    <span>ACTIVE</span>
+                                </span>
+                            </div>
+                            <div class="text-xs text-purple-300 font-medium" id="headerTeacherDesignation">Faculty</div>
+                        </div>
+                    </div>
+
+                    <div class="hidden xl:flex items-center space-x-2 bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800 text-xs text-slate-300">
+                        <div>Batches: <strong class="text-white" id="statBatches">0</strong></div>
+                        <span class="text-slate-700">|</span>
+                        <div>Lectures: <strong class="text-white" id="statLectures">0</strong></div>
+                        <span class="text-slate-700">|</span>
+                        <div>Tests: <strong class="text-white" id="statTests">0</strong></div>
+                    </div>
+
+                    <button onclick="app.logout()" class="hidden md:inline-flex items-center space-x-2 px-3.5 py-2 bg-slate-800/80 hover:bg-red-500/20 text-slate-300 hover:text-red-400 text-xs font-semibold rounded-xl transition border border-slate-700 hover:border-red-500/30">
+                        <i class="ph-bold ph-sign-out text-base"></i>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN VIEW AREA -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8">
+            <!-- VIEW 1: COURSES DASHBOARD -->
+            <div id="viewDashboard" class="space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-cardBg p-6 rounded-2xl border border-slate-800 shadow-lg">
+                    <div>
+                        <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+                            <i class="ph-bold ph-books text-purple-400"></i>
+                            <span>Assigned Course Batches</span>
+                        </h2>
+                        <p class="text-sm text-slate-400 mt-1">Manage lectures, study materials, student rosters, and assessments for your assigned courses.</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                                <i class="ph-bold ph-magnifying-glass"></i>
+                            </span>
+                            <input type="text" id="courseSearchInput" oninput="app.filterCourses()" placeholder="Search batches..." 
+                                class="pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500">
+                        </div>
+                        <button onclick="app.loadCourses()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition border border-slate-700" title="Refresh Courses">
+                            <i class="ph-bold ph-arrows-clockwise text-base"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Course Grid -->
+                <div id="coursesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="col-span-full py-16 text-center text-slate-500 flex flex-col items-center justify-center space-y-3">
+                        <div class="animate-spin w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+                        <p class="text-sm">Fetching assigned batches from Firestore...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: COURSE MANAGEMENT STUDIO -->
+            <div id="viewCourseStudio" class="hidden space-y-6">
+                <!-- Studio Header Navigation -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-cardBg p-6 rounded-2xl border border-slate-800 shadow-lg">
+                    <div class="flex items-center space-x-4">
+                        <button onclick="app.showDashboard()" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition border border-slate-700">
+                            <i class="ph-bold ph-arrow-left text-lg"></i>
+                        </button>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-semibold rounded-full" id="studioCategoryBadge">Category</span>
+                                <span class="text-xs text-slate-400" id="studioCourseIdTag">ID: ---</span>
+                            </div>
+                            <h2 class="text-xl font-bold text-white mt-1" id="studioCourseTitle">Course Studio</h2>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2 overflow-x-auto pb-1 md:pb-0" id="studioTabsContainer">
+                        <button onclick="app.switchStudioTab('content')" id="tabBtnContent" class="px-4 py-2 bg-purple-600 text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center space-x-2 whitespace-nowrap">
+                            <i class="ph-bold ph-video text-base"></i>
+                            <span>Lectures & Notes</span>
+                        </button>
+                        <button onclick="app.switchStudioTab('tests')" id="tabBtnTests" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition flex items-center space-x-2 whitespace-nowrap">
+                            <i class="ph-bold ph-notepad text-base"></i>
+                            <span>Tests & Quizzes</span>
+                        </button>
+                        <button onclick="app.switchStudioTab('students')" id="tabBtnStudents" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition flex items-center space-x-2 whitespace-nowrap">
+                            <i class="ph-bold ph-users text-base"></i>
+                            <span>Enrolled Students</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Studio Tab Content: Lectures & Notes -->
+                <div id="studioTabContent" class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Course Curriculum, Videos & Notes</h3>
+                            <p class="text-xs text-slate-400">Organize subjects, chapters, video lectures, and PDF study materials.</p>
+                        </div>
+                        <div class="flex items-center space-x-2" id="subjectActionButtons">
+                            <button onclick="app.openAddSubjectModal()" class="px-3.5 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5">
+                                <i class="ph-bold ph-plus text-sm"></i>
+                                <span>Add Subject</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="subjectsAccordionList" class="space-y-4">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Studio Tab Content: Tests & Quizzes -->
+                <div id="studioTabTests" class="hidden space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Interactive Assessments & MCQ Tests</h3>
+                            <p class="text-xs text-slate-400">Create tests with automated scoring and instant feedback.</p>
+                        </div>
+                        <button onclick="app.openCreateTestModal()" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center space-x-2">
+                            <i class="ph-bold ph-plus-circle text-base"></i>
+                            <span>Create New Test</span>
+                        </button>
+                    </div>
+
+                    <div id="testsListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Loaded tests -->
+                    </div>
+                </div>
+
+                <!-- Studio Tab Content: Enrolled Students -->
+                <div id="studioTabStudents" class="hidden space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Enrolled Students Directory</h3>
+                            <p class="text-xs text-slate-400">Students currently enrolled in this batch.</p>
+                        </div>
+                        <span class="px-3 py-1 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700" id="studentCountBadge">0 Students</span>
+                    </div>
+
+                    <div class="bg-cardBg rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
+                        <div class="p-3 border-b border-slate-800"><input id="studentSearchInput" type="search" placeholder="Search students by name, email or phone..." oninput="app.filterStudents()" class="w-full md:max-w-sm px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"></div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-slate-900/90 text-slate-400 border-b border-slate-800 uppercase tracking-wider text-[11px]">
+                                        <th class="p-4 font-semibold">Student Name</th>
+                                        <th class="p-4 font-semibold">Email Address</th>
+                                        <th class="p-4 font-semibold">Phone Number</th>
+                                        <th class="p-4 font-semibold text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="studentsTableBody" class="divide-y divide-slate-800/60">
+                                    <tr>
+                                        <td colspan="4" class="p-8 text-center text-slate-500">Loading student directory...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="bg-cardBg/60 border-t border-slate-800 py-4 px-6 text-center text-xs text-slate-500 mt-12">
+            WB STG Academy Teacher & Educator Portal • Secured Firebase v8 Real-time Sync
+        </footer>
+    </div>
+
+    <!-- MODALS -->
+
+    <!-- Add Subject Modal -->
+    <div id="modalAddSubject" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-darkBg/80 backdrop-blur-sm">
+        <div class="bg-cardBg w-full max-w-md rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+                    <i class="ph-bold ph-book-bookmark text-purple-400"></i>
+                    <span>Add New Subject</span>
+                </h3>
+                <button onclick="app.closeModal('modalAddSubject')" class="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-900">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </div>
+            <form id="formAddSubject" onsubmit="app.saveSubject(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Subject Title</label>
+                    <input type="text" id="newSubjectTitle" required placeholder="e.g. Physics" 
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Description / Note</label>
+                    <input type="text" id="newSubjectDesc" placeholder="e.g. Mechanics & Electrodynamics" 
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white">
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="app.closeModal('modalAddSubject')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-xl shadow-md">Save Subject</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Chapter Modal -->
+    <div id="modalAddChapter" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-darkBg/80 backdrop-blur-sm">
+        <div class="bg-cardBg w-full max-w-md rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+                    <i class="ph-bold ph-bookmark text-purple-400"></i>
+                    <span>Add New Chapter</span>
+                </h3>
+                <button onclick="app.closeModal('modalAddChapter')" class="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-900">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </div>
+            <form id="formAddChapter" onsubmit="app.saveChapter(event)" class="space-y-4">
+                <input type="hidden" id="chapterSubjectIdx">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Chapter Name</label>
+                    <input type="text" id="newChapterTitle" required placeholder="e.g. Chapter 1: Kinematics" 
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white">
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="app.closeModal('modalAddChapter')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-xl shadow-md">Save Chapter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Lecture Modal -->
+    <div id="modalAddLecture" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-darkBg/80 backdrop-blur-sm">
+        <div class="bg-cardBg w-full max-w-lg rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+                    <i class="ph-bold ph-video text-purple-400"></i>
+                    <span>Add Video Lecture</span>
+                </h3>
+                <button onclick="app.closeModal('modalAddLecture')" class="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-900">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </div>
+            <form id="formAddLecture" onsubmit="app.saveLecture(event)" class="space-y-4">
+                <input type="hidden" id="lecSubjectIdx">
+                <input type="hidden" id="lecChapterIdx">
+                <input type="hidden" id="lecEditIdx" value="-1">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Lecture Title</label>
+                    <input type="text" id="lecTitle" required placeholder="e.g. Lecture 1" 
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Video Link / Stream URL (YouTube / Drive / direct video)</label>
+                    <input type="url" id="lecVideoUrl" placeholder="https://youtube.com/..." 
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">PDF Notes / DPP Link</label>
+                    <input type="url" id="lecNotesUrl" placeholder="https://drive.google.com/..." class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-emerald-500 text-white">
+                    <p class="text-[11px] text-slate-500 mt-1">Optional — attach a Google Drive preview link or direct PDF URL.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Description</label>
+                    <textarea id="lecDescription" rows="2" placeholder="Lecture summary or learning outcomes" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Duration</label>
+                    <input type="text" id="lecDuration" placeholder="e.g. 40 mins" 
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white">
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="app.closeModal('modalAddLecture')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-xl shadow-md">Publish Lecture</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Material Modal -->
+    <div id="modalAddMaterial" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-darkBg/80 backdrop-blur-sm">
+        <div class="bg-cardBg w-full max-w-lg rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+                    <i class="ph-bold ph-file-pdf text-purple-400"></i>
+                    <span>Upload PDF Study Material</span>
+                </h3>
+                <button onclick="app.closeModal('modalAddMaterial')" class="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-900">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </div>
+            <form id="formAddMaterial" onsubmit="app.saveMaterial(event)" class="space-y-4">
+                <input type="hidden" id="matSubjectIdx">
+                <input type="hidden" id="matChapterIdx"><input type="hidden" id="matEditIdx" value="-1">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Material Title</label>
+                    <input type="text" id="matTitle" required placeholder="e.g. Formula Sheet PDF" 
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">PDF URL (Google Drive / Storage URL)</label>
+                    <input type="text" id="matPdfUrl" required placeholder="https://drive.google.com/..." 
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Category</label>
+                    <select id="matCategory" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white"><option>Notes</option><option>DPP</option><option>Formula Sheet</option></select>
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="app.closeModal('modalAddMaterial')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-xl shadow-md">Upload Material</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Test Modal -->
+    <div id="modalCreateTest" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-darkBg/80 backdrop-blur-sm overflow-y-auto">
+        <div class="bg-cardBg w-full max-w-2xl rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-6 my-8">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+                    <i class="ph-bold ph-notepad text-purple-400"></i>
+                    <span>Create Interactive MCQ Test</span>
+                </h3>
+                <button onclick="app.closeModal('modalCreateTest')" class="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-900">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </div>
+            
+            <form id="formCreateTest" onsubmit="app.saveTest(event)" class="space-y-5"><input type="hidden" id="testEditId" value="">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Test Title</label>
+                    <input type="text" id="testTitle" required placeholder="e.g. Kinematics Weekly Mock Test" 
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Time Limit (Minutes)</label>
+                        <input type="number" id="testDuration" required value="30" min="5" max="180" 
+                            class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Total Marks</label>
+                        <input type="number" id="testTotalMarks" required value="100" min="1" max="1000" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Passing Marks</label>
+                        <input type="number" id="testPassing" required value="40" min="1" max="1000" 
+                            class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-purple-500 text-white">
+                    </div>
+                </div>
+
+                <!-- Questions Container -->
+                <div class="space-y-4 pt-2">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-bold text-white uppercase tracking-wider">Test Questions</h4>
+                        <button type="button" onclick="app.addQuestionField()" class="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold rounded-xl flex items-center space-x-1">
+                            <i class="ph-bold ph-plus"></i>
+                            <span>Add Question</span>
+                        </button>
+                    </div>
+
+                    <div id="questionsBuilderContainer" class="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                        <!-- Question Item Template will be added here -->
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4 border-t border-slate-800">
+                    <button type="button" onclick="app.closeModal('modalCreateTest')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl shadow-md">Publish Test</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP SCRIPT -->
+    <script>
+        // Exact Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBIX-4bp0nTyvCubXeP8swsvEUzh1YvZkY",
+            authDomain: "yusuf-68347.firebaseapp.com",
+            projectId: "yusuf-68347",
+            storageBucket: "yusuf-68347.firebasestorage.app",
+            messagingSenderId: "360676380538",
+            appId: "1:360676380538:web:c3245178faa8d250fdd0c3",
+            databaseURL: "https://yusuf-68347-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+
+        class TeacherPortal {
+            constructor() {
+                this.teacher = null;
+                this.courses = [];
+                this.currentCourse = null;
+                this.currentCourseId = null;
+                this.enrolledStudents = [];
+                this.courseTests = [];
+                this.init();
+            }
+
+            init() {
+                // Password toggle
+                document.getElementById('togglePasswordBtn').addEventListener('click', () => {
+                    const pwdInput = document.getElementById('loginPassword');
+                    const icon = document.getElementById('togglePasswordIcon');
+                    if (pwdInput.type === 'password') {
+                        pwdInput.type = 'text';
+                        icon.className = 'ph-bold ph-eye-slash text-lg';
+                    } else {
+                        pwdInput.type = 'password';
+                        icon.className = 'ph-bold ph-eye text-lg';
+                    }
+                });
+
+                // Check localStorage for active session
+                const savedSession = localStorage.getItem('wb_teacher_session');
+                if (savedSession) {
+                    try {
+                        const parsed = JSON.parse(savedSession);
+                        // One-time migration: older portal builds treated missing permission
+                        // fields as false. Re-login so the current Firestore record is re-read.
+                        if (parsed.permissionDefaultsVersion !== 2) {
+                            localStorage.removeItem('wb_teacher_session');
+                        } else {
+                            this.teacher = parsed;
+                            this.enterDashboard();
+                        }
+                    } catch (err) {
+                        localStorage.removeItem('wb_teacher_session');
+                    }
+                }
+            }
+
+            async handleLogin(e) {
+                e.preventDefault();
+                const inputEmail = document.getElementById('loginEmail').value;
+                const inputPassword = document.getElementById('loginPassword').value;
+                const btn = document.getElementById('loginSubmitBtn');
+                const originalButton = `<span>Secure Sign In</span><i class="ph-bold ph-arrow-right"></i>`;
+                const cleanEmail = (inputEmail || '').trim().toLowerCase();
+                const cleanPass = String(inputPassword || '').trim();
+                const sanitizedId = cleanEmail.replace(/[^a-z0-9]/g, '_');
+                const alertOptions = { background: '#0f172a', color: '#fff', confirmButtonColor: '#8b5cf6' };
+
+                if (!cleanEmail || !cleanPass) {
+                    Swal.fire({ ...alertOptions, icon: 'warning', title: 'Required', text: 'Please enter both email and password / PIN.' });
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.innerHTML = `<div class="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto"></div>`;
+
+                try {
+                    // Attempt anonymous sign-in when the project's rules require an authenticated user.
+                    // This does not replace proper per-teacher authorization in Firestore rules.
+                    if (firebase.auth && firebase.auth().currentUser == null) {
+                        try {
+                            await firebase.auth().signInAnonymously();
+                        } catch (authError) {
+                            console.warn('Anonymous auth fallback:', authError);
+                        }
+                    }
+
+                    let teacherDoc = null;
+                    let teacherData = null;
+                    const lookupErrors = [];
+
+                    // 1. Exact document ID equal to the normalized email.
+                    try {
+                        const snap = await db.collection('sub_admins').doc(cleanEmail).get();
+                        if (snap.exists) { teacherDoc = snap; teacherData = snap.data(); }
+                    } catch (err) { lookupErrors.push(err); console.warn('Doc raw email lookup error:', err); }
+
+                    // 2. Sanitized document ID, e.g. teacher_gmail_com.
+                    if (!teacherData) {
+                        try {
+                            const snap = await db.collection('sub_admins').doc(sanitizedId).get();
+                            if (snap.exists) { teacherDoc = snap; teacherData = snap.data(); }
+                        } catch (err) { lookupErrors.push(err); console.warn('Doc sanitized lookup error:', err); }
+                    }
+
+                    // 3. Query the email field in sub_admins.
+                    if (!teacherData) {
+                        try {
+                            const snap = await db.collection('sub_admins').where('email', '==', cleanEmail).get();
+                            if (!snap.empty) { teacherDoc = snap.docs[0]; teacherData = teacherDoc.data(); }
+                        } catch (err) { lookupErrors.push(err); console.warn('Email query error:', err); }
+                    }
+
+                    // 4. Legacy/fallback teachers collection.
+                    if (!teacherData) {
+                        try {
+                            const directSnap = await db.collection('teachers').doc(cleanEmail).get();
+                            if (directSnap.exists) {
+                                teacherDoc = directSnap;
+                                teacherData = directSnap.data();
+                            } else {
+                                const querySnap = await db.collection('teachers').where('email', '==', cleanEmail).get();
+                                if (!querySnap.empty) { teacherDoc = querySnap.docs[0]; teacherData = teacherDoc.data(); }
+                            }
+                        } catch (err) { lookupErrors.push(err); console.warn('Teachers collection fallback error:', err); }
+                    }
+
+                    if (!teacherData) {
+                        // Do not claim the account is absent when every lookup failed due to rules/network/config.
+                        if (lookupErrors.length > 0) {
+                            Swal.fire({ ...alertOptions, icon: 'error', title: 'Could Not Verify Account', text: 'Teacher records could not be checked. Please check your connection and Firestore permissions, then try again.' });
+                        } else {
+                            Swal.fire({ ...alertOptions, icon: 'error', title: 'Account Not Found', text: `No teacher record was found for "${cleanEmail}". Make sure the teacher is added in the WB STG Admin Panel under "Manage Teachers & Sub-Admins".` });
+                        }
+                        return;
+                    }
+
+                    // Support string passwords and numeric PINs stored in Firestore.
+                    if (String(teacherData.password ?? '').trim() !== cleanPass) {
+                        Swal.fire({ ...alertOptions, icon: 'error', title: 'Incorrect Password', text: 'Password or PIN does not match. Please verify your credentials.' });
+                        return;
+                    }
+
+                    if (String(teacherData.status || '').toLowerCase() === 'suspended') {
+                        Swal.fire({ ...alertOptions, icon: 'warning', title: 'Access Suspended', text: 'Your teacher account has been suspended by the administrator.' });
+                        return;
+                    }
+
+                    // Keep the session key consistent with this portal and normalize permission flags.
+                    this.teacher = {
+                        id: teacherDoc.id,
+                        ...teacherData,
+                        email: teacherData.email || cleanEmail,
+                        name: teacherData.name || 'Faculty Member',
+                        designation: teacherData.designation || 'Educator',
+                        phone: teacherData.phone || '',
+                        allCourses: teacherData.allCourses === true,
+                        allowedCourses: Array.isArray(teacherData.allowedCourses) ? teacherData.allowedCourses : [],
+                        // Missing permission fields default to allowed for legacy teacher records;
+                        // an explicit false still restricts that capability.
+                        canAddLectures: teacherData.canAddLectures !== false,
+                        canAddNotes: teacherData.canAddNotes !== false,
+                        canManageTests: teacherData.canManageTests !== false,
+                        canViewStudents: teacherData.canViewStudents !== false,
+                        canPostNotices: teacherData.canPostNotices !== false,
+                        permissionDefaultsVersion: 2
+                    };
+                    localStorage.setItem('wb_teacher_session', JSON.stringify(this.teacher));
+                    this.enterDashboard();
+                    Swal.fire({ ...alertOptions, icon: 'success', title: `Welcome, ${this.teacher.name || 'Teacher'}!`, timer: 1500, showConfirmButton: false });
+                } catch (err) {
+                    console.error('Login error:', err);
+                    Swal.fire({ ...alertOptions, icon: 'error', title: 'Connection Error', text: 'Unable to complete teacher login. Please try again. ' + (err && err.message ? err.message : '') });
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalButton;
+                }
+            }
+
+            enterDashboard() {
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('appContainer').classList.remove('hidden');
+
+                // Populate Header Profile
+                document.getElementById('headerTeacherName').textContent = this.teacher.name;
+                document.getElementById('headerTeacherDesignation').textContent = this.teacher.designation;
+                document.getElementById('teacherAvatarInitial').textContent = this.teacher.name.charAt(0).toUpperCase();
+
+                // RBAC Permission Checks for Tabs
+                if (!this.teacher.canManageTests) {
+                    const tabTests = document.getElementById('tabBtnTests');
+                    if (tabTests) tabTests.style.display = 'none';
+                    const createTest = document.querySelector('#studioTabTests button[onclick="app.openCreateTestModal()"]');
+                    if (createTest) createTest.style.display = 'none';
+                }
+                if (!this.teacher.canViewStudents) {
+                    const tabStudents = document.getElementById('tabBtnStudents');
+                    if (tabStudents) tabStudents.style.display = 'none';
+                }
+
+                this.loadCourses();
+            }
+
+            logout() {
+                Swal.fire({
+                    title: 'Sign Out?',
+                    text: 'Are you sure you want to log out from the Teacher Portal?',
+                    icon: 'question',
+                    showCancelButton: true,
+                    background: '#0f172a',
+                    color: '#fff',
+                    confirmButtonColor: '#8b5cf6',
+                    cancelButtonColor: '#334155',
+                    confirmButtonText: 'Yes, Logout'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        localStorage.removeItem('wb_teacher_session');
+                        location.reload();
+                    }
+                });
+            }
+
+            async loadCourses() {
+                const grid = document.getElementById('coursesGrid');
+                grid.innerHTML = `
+                    <div class="col-span-full py-16 text-center text-slate-500 flex flex-col items-center justify-center space-y-3">
+                        <div class="animate-spin w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+                        <p class="text-sm">Syncing allowed course batches...</p>
+                    </div>
+                `;
+
+                try {
+                    const snapshot = await db.collection('courses').get();
+                    this.courses = [];
+
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        const courseId = doc.id;
+
+                        // Exact Filter Logic
+                        let hasAccess = false;
+                        if (this.teacher.allCourses === true) {
+                            hasAccess = true;
+                        } else if (this.teacher.allowedCourses && this.teacher.allowedCourses.includes(courseId)) {
+                            hasAccess = true;
+                        }
+
+                        if (hasAccess) {
+                            this.courses.push({ id: courseId, ...data });
+                        }
+                    });
+
+                    document.getElementById('statBatches').textContent = this.courses.length;
+
+                    // Calculate total lectures
+                    let totalLecs = 0;
+                    this.courses.forEach(c => {
+                        if (c.subjects && Array.isArray(c.subjects)) {
+                            c.subjects.forEach(s => {
+                                if (s.chapters && Array.isArray(s.chapters)) {
+                                    s.chapters.forEach(ch => {
+                                        if (ch.lectures && Array.isArray(ch.lectures)) {
+                                            totalLecs += ch.lectures.length;
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+                    document.getElementById('statLectures').textContent = totalLecs;
+
+                    // Fetch test count
+                    try {
+                        const testSnap = await db.collection('tests').where('createdBy', '==', this.teacher.email).get();
+                        document.getElementById('statTests').textContent = testSnap.size;
+                    } catch (e) {
+                        document.getElementById('statTests').textContent = '0';
+                    }
+
+                    this.renderCourses(this.courses);
+
+                } catch (err) {
+                    console.error("Error loading courses:", err);
+                    grid.innerHTML = `
+                        <div class="col-span-full py-16 text-center text-red-400 space-y-2">
+                            <i class="ph-bold ph-warning-circle text-3xl"></i>
+                            <p class="text-sm font-semibold">Failed to load courses from Firestore.</p>
+                            <p class="text-xs text-slate-500">${err.message}</p>
+                        </div>
+                    `;
+                }
+            }
+
+            renderCourses(coursesList) {
+                const grid = document.getElementById('coursesGrid');
+                if (coursesList.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full py-16 text-center text-slate-500 space-y-2">
+                            <i class="ph-bold ph-folder-open text-3xl"></i>
+                            <p class="text-sm">No course batches assigned to your account.</p>
+                            <p class="text-xs text-slate-600">Please contact the master administrator for course permissions.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                grid.innerHTML = coursesList.map(c => `
+                    <div class="glass-card rounded-2xl overflow-hidden shadow-xl border border-slate-800 flex flex-col justify-between hover:border-purple-500/40 transition group">
+                        <div>
+                            <div class="relative h-40 bg-slate-900 overflow-hidden">
+                                <img src="${c.image || c.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80'}" alt="${c.title}" 
+                                    class="w-full h-full object-cover group-hover:scale-105 transition duration-500 opacity-80">
+                                <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
+                                <span class="absolute top-3 left-3 px-2.5 py-1 bg-purple-600/90 backdrop-blur-md text-white text-[10px] font-bold rounded-lg uppercase tracking-wider shadow">
+                                    ${c.category || 'General Batch'}
+                                </span>
+                            </div>
+                            <div class="p-5 space-y-2">
+                                <h3 class="font-bold text-base text-white line-clamp-1 group-hover:text-purple-400 transition">${c.title || 'Untitled Course'}</h3>
+                                <p class="text-xs text-slate-400 line-clamp-2">${c.desc || c.description || 'Comprehensive study curriculum and structured lectures.'}</p>
+                            </div>
+                        </div>
+                        <div class="p-5 pt-0">
+                            <button onclick="app.openCourseStudio('${c.id}')" class="w-full py-2.5 px-4 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/30 hover:border-purple-600 text-xs font-semibold rounded-xl transition flex items-center justify-center space-x-2 shadow">
+                                <i class="ph-bold ph-folder-notch-open text-base"></i>
+                                <span>Manage Batch</span>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            filterCourses() {
+                const query = document.getElementById('courseSearchInput').value.toLowerCase();
+                const filtered = this.courses.filter(c => 
+                    (c.title && c.title.toLowerCase().includes(query)) ||
+                    (c.category && c.category.toLowerCase().includes(query)) ||
+                    (c.desc && c.desc.toLowerCase().includes(query)) ||
+                    (c.description && c.description.toLowerCase().includes(query))
+                );
+                this.renderCourses(filtered);
+            }
+
+            async openCourseStudio(courseId) {
+                const permitted = this.teacher && (this.teacher.allCourses === true || (Array.isArray(this.teacher.allowedCourses) && this.teacher.allowedCourses.includes(courseId)));
+                if (!permitted) return this.denied();
+                try {
+                    Swal.fire({
+                        title: 'Opening Batch...',
+                        text: 'Fetching curriculum and real-time data...',
+                        background: '#0f172a',
+                        color: '#fff',
+                        allowOutsideClick: false,
+                        didOpen: () => Swal.showLoading()
+                    });
+
+                    const docRef = await db.collection('courses').doc(courseId).get();
+                    if (!docRef.exists) {
+                        Swal.close();
+                        Swal.fire({ icon: 'error', title: 'Not Found', text: 'Course batch no longer exists.', background: '#0f172a', color: '#fff' });
+                        return;
+                    }
+
+                    this.currentCourseId = courseId;
+                    this.currentCourse = docRef.data();
+
+                    Swal.close();
+
+                    // Update Studio header
+                    document.getElementById('studioCourseTitle').textContent = this.currentCourse.title || 'Course Studio';
+                    document.getElementById('studioCategoryBadge').textContent = this.currentCourse.category || 'Batch';
+                    document.getElementById('studioCourseIdTag').textContent = `ID: ${courseId}`;
+
+                    // Switch views
+                    document.getElementById('viewDashboard').classList.add('hidden');
+                    document.getElementById('viewCourseStudio').classList.remove('hidden');
+
+                    this.switchStudioTab('content');
+
+                } catch (err) {
+                    Swal.close();
+                    console.error("Error opening course studio:", err);
+                    Swal.fire({ icon: 'error', title: 'Error', text: err.message, background: '#0f172a', color: '#fff' });
+                }
+            }
+
+            showDashboard() {
+                document.getElementById('viewCourseStudio').classList.add('hidden');
+                document.getElementById('viewDashboard').classList.remove('hidden');
+                this.currentCourse = null;
+                this.currentCourseId = null;
+                this.loadCourses();
+            }
+
+            switchStudioTab(tabName) {
+                const btnContent = document.getElementById('tabBtnContent');
+                const btnTests = document.getElementById('tabBtnTests');
+                const btnStudents = document.getElementById('tabBtnStudents');
+
+                const tabContent = document.getElementById('studioTabContent');
+                const tabTests = document.getElementById('studioTabTests');
+                const tabStudents = document.getElementById('studioTabStudents');
+
+                // Reset tabs
+                [btnContent, btnTests, btnStudents].forEach(b => {
+                    if (b) {
+                        b.className = "px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition flex items-center space-x-2 whitespace-nowrap";
+                    }
+                });
+                [tabContent, tabTests, tabStudents].forEach(t => {
+                    if (t) t.classList.add('hidden');
+                });
+
+                if (tabName === 'content') {
+                    if (btnContent) btnContent.className = "px-4 py-2 bg-purple-600 text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center space-x-2 whitespace-nowrap";
+                    if (tabContent) tabContent.classList.remove('hidden');
+                    this.renderSubjectsAccordion();
+                } else if (tabName === 'tests') {
+                    if (btnTests) btnTests.className = "px-4 py-2 bg-purple-600 text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center space-x-2 whitespace-nowrap";
+                    if (tabTests) tabTests.classList.remove('hidden');
+                    this.loadCourseTests();
+                } else if (tabName === 'students') {
+                    if (btnStudents) btnStudents.className = "px-4 py-2 bg-purple-600 text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center space-x-2 whitespace-nowrap";
+                    if (tabStudents) tabStudents.classList.remove('hidden');
+                    this.loadEnrolledStudents();
+                }
+            }
+
+            renderSubjectsAccordion() {
+                const container = document.getElementById('subjectsAccordionList');
+                const subjects = this.currentCourse.subjects || [];
+
+                const canAddLec = this.teacher.canAddLectures;
+                const canAddNot = this.teacher.canAddNotes;
+
+                const actionDiv = document.getElementById('subjectActionButtons');
+                actionDiv.innerHTML = `
+                    ${canAddLec ? `<button onclick="app.openAddSubjectModal()" class="px-3.5 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5"><i class="ph-bold ph-plus text-sm"></i><span>Add Subject</span></button>` : ''}
+                    ${!canAddLec ? `<span class="px-3 py-1.5 bg-amber-500/10 text-amber-300 text-xs font-medium rounded-xl border border-amber-500/20">Lecture management restricted</span>` : ''}
+                    ${!canAddNot ? `<span class="px-3 py-1.5 bg-amber-500/10 text-amber-300 text-xs font-medium rounded-xl border border-amber-500/20">Notes management restricted</span>` : ''}
+                `;
+
+                if (subjects.length === 0) {
+                    container.innerHTML = `
+                        <div class="bg-cardBg p-8 rounded-2xl border border-slate-800 text-center text-slate-500 space-y-2">
+                            <i class="ph-bold ph-book text-3xl"></i>
+                            <p class="text-sm">No subjects added to this course batch yet.</p>
+                            ${canAddLec ? `<p class="text-xs text-purple-400">Click "+ Add Subject" above to start building the curriculum.</p>` : ''}
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = subjects.map((subj, sIdx) => `
+                    <div class="bg-cardBg rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
+                        <div class="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 rounded-lg bg-purple-600/20 text-purple-400 flex items-center justify-center font-bold text-xs border border-purple-500/30">
+                                    S${sIdx + 1}
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-sm text-white">${subj.name || subj.title || 'Untitled Subject'}</h4>
+                                    <p class="text-[11px] text-slate-400">${subj.description || ''}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                ${canAddLec ? `
+                                    <button onclick="app.openAddChapterModal(${sIdx})" class="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-semibold rounded-xl border border-purple-500/30 transition flex items-center space-x-1">
+                                        <i class="ph-bold ph-plus"></i>
+                                        <span>Add Chapter</span>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Chapters List -->
+                        <div class="p-4 space-y-4">
+                            ${(!subj.chapters || subj.chapters.length === 0) ? `
+                                <p class="text-xs text-slate-500 italic text-center py-2">No chapters in this subject yet.</p>
+                            ` : subj.chapters.map((chap, cIdx) => `
+                                <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800 space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-2">
+                                            <i class="ph-bold ph-bookmark text-purple-400"></i>
+                                            <span class="font-bold text-xs text-slate-200">${chap.name || chap.title}</span>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            ${canAddLec ? `
+                                                <button onclick="app.openAddLectureModal(${sIdx}, ${cIdx})" class="px-2.5 py-1 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white text-[11px] font-semibold rounded-lg transition border border-purple-500/30 flex items-center space-x-1">
+                                                    <i class="ph-bold ph-video"></i>
+                                                    <span>+ Lecture</span>
+                                                </button>
+                                            ` : ''}
+                                            ${canAddNot ? `
+                                                <button onclick="app.openAddMaterialModal(${sIdx}, ${cIdx})" class="px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-[11px] font-semibold rounded-lg transition border border-emerald-500/30 flex items-center space-x-1">
+                                                    <i class="ph-bold ph-file-pdf"></i>
+                                                    <span>+ PDF Note</span>
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+
+                                    <!-- Lectures inside Chapter -->
+                                    ${chap.lectures && chap.lectures.length > 0 ? `
+                                        <div class="space-y-2 pt-1 border-t border-slate-800/80">
+                                            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Video Lectures (${chap.lectures.length})</div>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                ${chap.lectures.map((lec, lIdx) => {
+                                                    const videoLink = lec.video || lec.videoUrl || lec.videoLink || '';
+                                                    const notesLink = lec.notes || lec.pdf || lec.pdfUrl || lec.notesUrl || '';
+                                                    return `
+                                                    <div class="p-3 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-col gap-3 text-xs">
+                                                        <div class="flex items-start gap-2 min-w-0">
+                                                            <div class="p-1.5 bg-purple-600/20 text-purple-400 rounded-lg shrink-0"><i class="ph-bold ph-video"></i></div>
+                                                            <div class="min-w-0 flex-1">
+                                                                <div class="font-semibold text-white break-words">${this.escapeHtml(lec.title || 'Untitled Lecture')}</div>
+                                                                <div class="text-[10px] text-slate-400 mt-1">${this.escapeHtml(lec.duration || 'Duration not set')}${lec.description ? ' · ' + this.escapeHtml(lec.description) : ''}</div>
+                                                                <div class="flex flex-wrap gap-1.5 mt-2">
+                                                                    ${videoLink ? '<span class="px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[10px]">🎥 Video Link Added</span>' : '<span class="px-2 py-1 rounded-md bg-slate-800 text-slate-400 text-[10px]">Video link missing</span>'}
+                                                                    ${notesLink ? '<span class="px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px]">📄 PDF Notes Attached</span>' : '<span class="px-2 py-1 rounded-md bg-slate-800 text-slate-400 text-[10px]">PDF notes not attached</span>'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="flex flex-wrap items-center gap-2 border-t border-slate-800 pt-2">
+                                                            ${videoLink ? `<a href="${this.safeUrl(videoLink)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded-lg bg-blue-600/15 text-blue-300 border border-blue-500/20">▶ Open Video</a>` : ''}
+                                                            ${notesLink ? `<a href="${this.safeUrl(notesLink)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded-lg bg-emerald-600/15 text-emerald-300 border border-emerald-500/20">📄 Open PDF Notes</a>` : ''}
+                                                            ${canAddLec ? `<button onclick="app.editLecture(${sIdx},${cIdx},${lIdx})" class="px-2.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-200 border border-indigo-500/30 rounded-lg font-semibold">✏️ Edit</button><button onclick="app.deleteLecture(${sIdx},${cIdx},${lIdx})" class="px-2.5 py-1.5 bg-red-600/15 hover:bg-red-600/30 text-red-300 border border-red-500/20 rounded-lg font-semibold">🗑️ Delete</button>` : ''}
+                                                        </div>
+                                                    </div>`;
+                                                }).join('')}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+
+                                    <!-- Materials inside Chapter -->
+                                    ${chap.materials && chap.materials.length > 0 ? `
+                                        <div class="space-y-2 pt-2 border-t border-slate-800/80">
+                                            <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Study Materials & Notes (${chap.materials.length})</div>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                ${chap.materials.map((mat, mIdx) => `
+                                                    <div class="p-2.5 bg-slate-950/80 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+                                                        <div class="flex items-center space-x-2.5 truncate">
+                                                            <div class="p-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg"><i class="ph-bold ph-file-pdf"></i></div>
+                                                            <div class="truncate">
+                                                                <div class="font-semibold text-white truncate">${mat.title}</div>
+                                                                <div class="text-[10px] text-slate-400">${mat.category || 'Notes'} · PDF Document</div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="flex items-center gap-1 shrink-0">
+                                                            <a href="${this.safeUrl(mat.pdfUrl || mat.url)}" target="_blank" rel="noopener noreferrer" class="p-1.5 bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white rounded-lg transition" title="Open PDF"><i class="ph-bold ph-arrow-square-out text-sm"></i></a>
+                                                            ${canAddNot ? `<button onclick="app.editMaterial(${sIdx},${cIdx},${mIdx})" class="p-1.5 bg-slate-800 hover:bg-indigo-600 text-slate-300 rounded-lg" title="Edit notes"><i class="ph-bold ph-pencil-simple"></i></button><button onclick="app.deleteMaterial(${sIdx},${cIdx},${mIdx})" class="p-1.5 bg-slate-800 hover:bg-red-600 text-slate-300 rounded-lg" title="Delete notes"><i class="ph-bold ph-trash"></i></button>` : ''}
+                                                        </div>
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Modal Controls
+            openAddSubjectModal() {
+                document.getElementById('newSubjectTitle').value = '';
+                document.getElementById('newSubjectDesc').value = '';
+                document.getElementById('modalAddSubject').classList.remove('hidden');
+                document.getElementById('modalAddSubject').classList.add('flex');
+            }
+
+            openAddChapterModal(sIdx) {
+                document.getElementById('chapterSubjectIdx').value = sIdx;
+                document.getElementById('newChapterTitle').value = '';
+                document.getElementById('modalAddChapter').classList.remove('hidden');
+                document.getElementById('modalAddChapter').classList.add('flex');
+            }
+
+            openAddLectureModal(sIdx, cIdx) {
+                if (!this.teacher.canAddLectures) return this.denied();
+                document.getElementById('lecSubjectIdx').value = sIdx;
+                document.getElementById('lecChapterIdx').value = cIdx;
+                document.getElementById('lecEditIdx').value = -1;
+                document.getElementById('lecTitle').value = '';
+                document.getElementById('lecVideoUrl').value = '';
+                document.getElementById('lecNotesUrl').value = '';
+                document.getElementById('lecDuration').value = '';
+                document.getElementById('lecDescription').value = '';
+                document.querySelector('#modalAddLecture h3 span').textContent = 'Add Video Lecture';
+                document.querySelector('#formAddLecture button[type="submit"]').textContent = 'Publish Lecture';
+                this.openModal('modalAddLecture');
+            }
+
+            editLecture(sIdx, cIdx, lIdx) {
+                if (!this.teacher.canAddLectures) return this.denied();
+                const lec = this.currentCourse.subjects[sIdx].chapters[cIdx].lectures[lIdx];
+                document.getElementById('lecSubjectIdx').value = sIdx;
+                document.getElementById('lecChapterIdx').value = cIdx;
+                document.getElementById('lecEditIdx').value = lIdx;
+                document.getElementById('lecTitle').value = lec.title || '';
+                document.getElementById('lecVideoUrl').value = lec.video || lec.videoUrl || lec.videoLink || '';
+                document.getElementById('lecNotesUrl').value = lec.notes || lec.pdf || lec.pdfUrl || lec.notesUrl || '';
+                document.getElementById('lecDuration').value = lec.duration || '';
+                document.getElementById('lecDescription').value = lec.description || '';
+                document.querySelector('#modalAddLecture h3 span').textContent = 'Edit Existing Lecture';
+                document.querySelector('#formAddLecture button[type="submit"]').textContent = 'Save Changes';
+                this.openModal('modalAddLecture');
+            }
+
+            openAddMaterialModal(sIdx, cIdx) {
+                if (!this.teacher.canAddNotes) return this.denied();
+                document.getElementById('matSubjectIdx').value = sIdx;
+                document.getElementById('matChapterIdx').value = cIdx;
+                document.getElementById('matEditIdx').value = -1;
+                document.getElementById('matTitle').value = '';
+                document.getElementById('matPdfUrl').value = '';
+                document.getElementById('matCategory').value = 'Notes';
+                document.querySelector('#modalAddMaterial h3 span').textContent = 'Upload PDF Study Material';
+                document.querySelector('#formAddMaterial button[type="submit"]').textContent = 'Upload Material';
+                this.openModal('modalAddMaterial');
+            }
+
+            editMaterial(sIdx, cIdx, mIdx) {
+                if (!this.teacher.canAddNotes) return this.denied();
+                const mat = this.currentCourse.subjects[sIdx].chapters[cIdx].materials[mIdx];
+                document.getElementById('matSubjectIdx').value = sIdx;
+                document.getElementById('matChapterIdx').value = cIdx;
+                document.getElementById('matEditIdx').value = mIdx;
+                document.getElementById('matTitle').value = mat.title || '';
+                document.getElementById('matPdfUrl').value = mat.pdfUrl || mat.url || '';
+                document.getElementById('matCategory').value = mat.category || 'Notes';
+                document.querySelector('#modalAddMaterial h3 span').textContent = 'Edit Existing Notes';
+                document.querySelector('#formAddMaterial button[type="submit"]').textContent = 'Save Changes';
+                this.openModal('modalAddMaterial');
+            }
+
+            openModal(id) {
+                document.getElementById(id).classList.remove('hidden');
+                document.getElementById(id).classList.add('flex');
+            }
+
+            denied() {
+                Swal.fire({icon:'warning',title:'Permission restricted',text:'Your teacher account does not have permission for this action.',background:'#0f172a',color:'#fff'});
+            }
+
+            escapeHtml(value) {
+                return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+            }
+
+            safeUrl(value) {
+                try {
+                    const u = new URL(String(value || ''), window.location.href);
+                    return ['http:', 'https:'].includes(u.protocol) ? u.href : '#';
+                } catch (_) { return '#'; }
+            }
+
+            async deleteLecture(sIdx, cIdx, lIdx) {
+                if (!this.teacher.canAddLectures) return this.denied();
+                const ok = await Swal.fire({title:'Delete lecture?',text:'This removes the lecture from this chapter.',icon:'warning',showCancelButton:true,confirmButtonText:'Delete',confirmButtonColor:'#dc2626',background:'#0f172a',color:'#fff'});
+                if (!ok.isConfirmed) return;
+                this.currentCourse.subjects[sIdx].chapters[cIdx].lectures.splice(lIdx,1);
+                if (await this.updateCourseInFirestore()) { this.renderSubjectsAccordion(); this.toast('Lecture deleted'); }
+            }
+
+            async deleteMaterial(sIdx, cIdx, mIdx) {
+                if (!this.teacher.canAddNotes) return this.denied();
+                const ok = await Swal.fire({title:'Delete study material?',text:'This removes the PDF note from this chapter.',icon:'warning',showCancelButton:true,confirmButtonText:'Delete',confirmButtonColor:'#dc2626',background:'#0f172a',color:'#fff'});
+                if (!ok.isConfirmed) return;
+                this.currentCourse.subjects[sIdx].chapters[cIdx].materials.splice(mIdx,1);
+                if (await this.updateCourseInFirestore()) { this.renderSubjectsAccordion(); this.toast('Study material deleted'); }
+            }
+
+            toast(message) {
+                Swal.fire({toast:true,position:'top-end',icon:'success',title:message,showConfirmButton:false,timer:2200,background:'#0f172a',color:'#fff'});
+            }
+
+            closeModal(modalId) {
+                document.getElementById(modalId).classList.add('hidden');
+                document.getElementById(modalId).classList.remove('flex');
+            }
+
+            async saveSubject(e) {
+                e.preventDefault();
+                const title = document.getElementById('newSubjectTitle').value.trim();
+                const desc = document.getElementById('newSubjectDesc').value.trim();
+
+                if (!this.currentCourse.subjects) this.currentCourse.subjects = [];
+                this.currentCourse.subjects.push({
+                    name: title,
+                    description: desc,
+                    chapters: []
+                });
+
+                await this.updateCourseInFirestore();
+                this.closeModal('modalAddSubject');
+                this.renderSubjectsAccordion();
+                Swal.fire({ icon: 'success', title: 'Subject Added', text: 'New subject added successfully.', background: '#0f172a', color: '#fff', timer: 1500, showConfirmButton: false });
+            }
+
+            async saveChapter(e) {
+                e.preventDefault();
+                const sIdx = parseInt(document.getElementById('chapterSubjectIdx').value);
+                const title = document.getElementById('newChapterTitle').value.trim();
+
+                if (!this.currentCourse.subjects[sIdx].chapters) {
+                    this.currentCourse.subjects[sIdx].chapters = [];
+                }
+                this.currentCourse.subjects[sIdx].chapters.push({
+                    name: title,
+                    lectures: [],
+                    materials: []
+                });
+
+                await this.updateCourseInFirestore();
+                this.closeModal('modalAddChapter');
+                this.renderSubjectsAccordion();
+                Swal.fire({ icon: 'success', title: 'Chapter Added', text: 'New chapter added successfully.', background: '#0f172a', color: '#fff', timer: 1500, showConfirmButton: false });
+            }
+
+            async saveLecture(e) {
+                e.preventDefault();
+                if (!this.teacher.canAddLectures) return this.denied();
+                const sIdx = Number(document.getElementById('lecSubjectIdx').value);
+                const cIdx = Number(document.getElementById('lecChapterIdx').value);
+                const lIdx = Number(document.getElementById('lecEditIdx').value);
+                const title = document.getElementById('lecTitle').value.trim();
+                const video = document.getElementById('lecVideoUrl').value.trim();
+                const notes = document.getElementById('lecNotesUrl').value.trim();
+                const validUrl = value => !value || /^https?:\/\//i.test(value);
+                if (!title) return Swal.fire({icon:'warning',title:'Title required',text:'Please enter a lecture title.',background:'#0f172a',color:'#fff'});
+                if (!validUrl(video) || !validUrl(notes)) return Swal.fire({icon:'warning',title:'Invalid URL',text:'Video and PDF links must start with http:// or https://.',background:'#0f172a',color:'#fff'});
+                const chapter = this.currentCourse.subjects[sIdx].chapters[cIdx];
+                if (!Array.isArray(chapter.lectures)) chapter.lectures = [];
+                const previous = lIdx >= 0 ? chapter.lectures[lIdx] || {} : {};
+                const lecture = {
+                    ...previous,
+                    title,
+                    video,
+                    notes,
+                    duration: document.getElementById('lecDuration').value.trim(),
+                    description: document.getElementById('lecDescription').value.trim()
+                };
+                // Keep legacy aliases in sync so older app screens continue to read the links.
+                lecture.videoUrl = video;
+                lecture.pdfUrl = notes;
+                if (lIdx >= 0) chapter.lectures[lIdx] = lecture;
+                else chapter.lectures.push(lecture);
+                if (await this.updateCourseInFirestore()) {
+                    this.closeModal('modalAddLecture');
+                    this.renderSubjectsAccordion();
+                    this.toast(lIdx >= 0 ? 'Lecture & PDF Notes Updated!' : 'Lecture & PDF Notes Uploaded!');
+                }
+            }
+
+            async saveMaterial(e) {
+                e.preventDefault();
+                if (!this.teacher.canAddNotes) return this.denied();
+                const sIdx = Number(document.getElementById('matSubjectIdx').value);
+                const cIdx = Number(document.getElementById('matChapterIdx').value);
+                const mIdx = Number(document.getElementById('matEditIdx').value);
+                const pdfUrl = document.getElementById('matPdfUrl').value.trim();
+                if (!/^https?:\/\//i.test(pdfUrl)) return Swal.fire({icon:'warning',title:'Invalid URL',text:'Enter a valid http/https PDF URL.',background:'#0f172a',color:'#fff'});
+                const material = {
+                    title: document.getElementById('matTitle').value.trim(),
+                    pdfUrl,
+                    category: document.getElementById('matCategory').value
+                };
+                const chapter = this.currentCourse.subjects[sIdx].chapters[cIdx];
+                if (!Array.isArray(chapter.materials)) chapter.materials = [];
+                if (mIdx >= 0) chapter.materials[mIdx] = material; else chapter.materials.push(material);
+                if (await this.updateCourseInFirestore()) {
+                    this.closeModal('modalAddMaterial'); this.renderSubjectsAccordion();
+                    this.toast(mIdx >= 0 ? 'Study material updated' : 'Study material uploaded');
+                }
+            }
+
+            async updateCourseInFirestore() {
+                try {
+                    await db.collection('courses').doc(this.currentCourseId).update({
+                        subjects: this.currentCourse.subjects
+                    });
+                    return true;
+                } catch (err) {
+                    console.error("Firestore update error:", err);
+                    Swal.fire({ icon: 'error', title: 'Sync Error', text: 'Failed to update Firestore database: ' + err.message, background: '#0f172a', color: '#fff' });
+                    return false;
+                }
+            }
+
+            // Tests Management
+            openCreateTestModal() {
+                if (!this.teacher.canManageTests) return this.denied();
+                document.getElementById('testEditId').value = '';
+                document.getElementById('testTitle').value = '';
+                document.getElementById('testDuration').value = '30';
+                document.getElementById('testTotalMarks').value = '100';
+                document.getElementById('testPassing').value = '40';
+                document.getElementById('questionsBuilderContainer').innerHTML = '';
+                document.querySelector('#modalCreateTest h3 span').textContent = 'Create Interactive MCQ Test';
+                document.querySelector('#formCreateTest button[type="submit"]').textContent = 'Publish Test';
+                this.addQuestionField();
+                this.openModal('modalCreateTest');
+            }
+
+            editTest(testId) {
+                if (!this.teacher.canManageTests) return this.denied();
+                const t = this.courseTests.find(x => x.id === testId);
+                if (!t) return;
+                document.getElementById('testEditId').value = testId;
+                document.getElementById('testTitle').value = t.title || '';
+                document.getElementById('testDuration').value = t.durationMinutes || 30;
+                document.getElementById('testTotalMarks').value = t.totalMarks || 100;
+                document.getElementById('testPassing').value = t.passingMarks || 40;
+                const box = document.getElementById('questionsBuilderContainer'); box.innerHTML = '';
+                (t.questions || []).forEach(q => this.addQuestionField(q));
+                if (!t.questions || !t.questions.length) this.addQuestionField();
+                document.querySelector('#modalCreateTest h3 span').textContent = 'Edit Existing Test';
+                document.querySelector('#formCreateTest button[type="submit"]').textContent = 'Save Test Changes';
+                this.openModal('modalCreateTest');
+            }
+
+            async deleteTest(testId) {
+                if (!this.teacher.canManageTests) return this.denied();
+                const ok = await Swal.fire({title:'Delete test?',text:'This assessment will be permanently removed.',icon:'warning',showCancelButton:true,confirmButtonText:'Delete',confirmButtonColor:'#dc2626',background:'#0f172a',color:'#fff'});
+                if (!ok.isConfirmed) return;
+                try {
+                    await db.collection('tests').doc(testId).delete();
+                    this.courseTests = this.courseTests.filter(t => t.id !== testId);
+                    this.loadCourseTests(); this.toast('Test deleted');
+                } catch(err) { Swal.fire({icon:'error',title:'Delete failed',text:err.message,background:'#0f172a',color:'#fff'}); }
+            }
+
+            addQuestionField(q = {}) {
+                const container = document.getElementById('questionsBuilderContainer');
+                const qIdx = container.children.length + 1;
+
+                const qDiv = document.createElement('div');
+                qDiv.className = 'p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-3 question-block';
+                qDiv.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-xs text-purple-400">Question #${qIdx}</span>
+                        <button type="button" onclick="this.closest('.question-block').remove()" class="text-xs text-red-400 hover:text-red-300"><i class="ph-bold ph-trash"></i> Remove</button>
+                    </div>
+                    <div>
+                        <input type="text" placeholder="Enter question text here..." required class="q-text w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <input type="text" placeholder="Option A" required class="q-optA w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-purple-500">
+                        <input type="text" placeholder="Option B" required class="q-optB w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-purple-500">
+                        <input type="text" placeholder="Option C" required class="q-optC w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-purple-500">
+                        <input type="text" placeholder="Option D" required class="q-optD w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+                        <div>
+                            <label class="block text-[10px] uppercase font-semibold text-slate-400 mb-1">Correct Option Index (0=A, 1=B, 2=C, 3=D)</label>
+                            <select class="q-correct w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-purple-500">
+                                <option value="0">0 (Option A)</option>
+                                <option value="1">1 (Option B)</option>
+                                <option value="2">2 (Option C)</option>
+                                <option value="3">3 (Option D)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] uppercase font-semibold text-slate-400 mb-1">Solution Note / Explanation</label>
+                            <input type="text" placeholder="Brief explanation..." class="q-solution w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-purple-500">
+                        </div>
+                    </div>
+                `;
+                container.appendChild(qDiv);
+                qDiv.querySelector('.q-text').value = q.question || '';
+                const opts = Array.isArray(q.options) ? q.options : [];
+                ['A','B','C','D'].forEach((letter, i) => qDiv.querySelector('.q-opt' + letter).value = opts[i] || '');
+                qDiv.querySelector('.q-correct').value = String(Number.isInteger(q.correctOption) ? q.correctOption : 0);
+                qDiv.querySelector('.q-solution').value = q.solution || '';
+            }
+
+            async saveTest(e) {
+                e.preventDefault();
+                if (!this.teacher.canManageTests) return this.denied();
+                const title = document.getElementById('testTitle').value.trim();
+                const duration = parseInt(document.getElementById('testDuration').value,10);
+                const totalMarks = parseInt(document.getElementById('testTotalMarks').value,10);
+                const passing = parseInt(document.getElementById('testPassing').value,10);
+                const questions = [...document.querySelectorAll('.question-block')].map(block => ({
+                    question: block.querySelector('.q-text').value.trim(),
+                    options: ['A','B','C','D'].map(letter => block.querySelector('.q-opt'+letter).value.trim()),
+                    correctOption: parseInt(block.querySelector('.q-correct').value,10),
+                    solution: block.querySelector('.q-solution').value.trim()
+                }));
+                if (!questions.length || questions.some(q => !q.question || q.options.some(o => !o))) {
+                    return Swal.fire({icon:'warning',title:'Complete the questions',text:'Add at least one question and fill in all four options for every question.',background:'#0f172a',color:'#fff'});
+                }
+                if (passing > totalMarks) return Swal.fire({icon:'warning',title:'Check marks',text:'Passing marks cannot exceed total marks.',background:'#0f172a',color:'#fff'});
+                const testId = document.getElementById('testEditId').value;
+                const payload = {courseId:this.currentCourseId,title,durationMinutes:duration,totalMarks,passingMarks:passing,totalQuestions:questions.length,questions,createdBy:this.teacher.email,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+                try {
+                    await (testId ? db.collection('tests').doc(testId).update(payload) : db.collection('tests').add({...payload,createdAt:firebase.firestore.FieldValue.serverTimestamp()}));
+                    this.closeModal('modalCreateTest'); await this.loadCourseTests(); this.toast(testId ? 'Test updated' : 'Test published');
+                } catch(err) {
+                    Swal.fire({icon:'error',title:'Save failed',text:err.message,background:'#0f172a',color:'#fff'});
+                }
+            }
+
+            async loadCourseTests() {
+                const container = document.getElementById('testsListContainer');
+                container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-500"><div class="animate-spin w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-2"></div>Loading tests...</div>`;
+
+                try {
+                    const snapshot = await db.collection('tests').where('courseId', '==', this.currentCourseId).get();
+                    this.courseTests = [];
+                    snapshot.forEach(doc => {
+                        this.courseTests.push({ id: doc.id, ...doc.data() });
+                    });
+
+                    if (this.courseTests.length === 0) {
+                        container.innerHTML = `
+                            <div class="col-span-full py-12 bg-cardBg rounded-2xl border border-slate-800 text-center text-slate-500 space-y-2">
+                                <i class="ph-bold ph-notepad text-3xl"></i>
+                                <p class="text-sm">No tests or quizzes created for this batch yet.</p>
+                                <p class="text-xs text-purple-400">Click "Create New Test" above to build an assessment.</p>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    container.innerHTML = this.courseTests.map(t => `
+                        <div class="glass-card rounded-2xl p-5 border border-slate-800 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="px-2.5 py-1 bg-purple-600/20 text-purple-300 text-[10px] font-bold rounded-lg border border-purple-500/30 uppercase">Assessment</span>
+                                <span class="text-xs text-slate-400"><i class="ph-bold ph-clock"></i> ${t.durationMinutes || 30} Mins</span>
+                            </div>
+                            <h4 class="font-bold text-base text-white">${t.title}</h4>
+                            <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800">
+                                <span>Questions: <strong class="text-white">${t.totalQuestions || (t.questions ? t.questions.length : 0)}</strong></span>
+                                <span>Marks: <strong class="text-white">${t.totalMarks || 100}</strong> · Pass: <strong class="text-white">${t.passingMarks || 40}</strong></span>
+                            </div>
+                            ${this.teacher.canManageTests ? `<div class="flex gap-2 pt-1"><button onclick="app.editTest('${t.id}')" class="flex-1 px-3 py-2 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 text-xs"><i class="ph-bold ph-pencil-simple"></i> Edit Test</button><button onclick="app.deleteTest('${t.id}')" class="px-3 py-2 rounded-lg bg-red-500/10 text-red-300 border border-red-500/20 text-xs"><i class="ph-bold ph-trash"></i> Delete</button></div>` : ''}
+                        </div>
+                    `).join('');
+
+                } catch (err) {
+                    console.error("Error loading tests:", err);
+                    container.innerHTML = `<div class="col-span-full py-12 text-center text-red-400">Failed to load tests.</div>`;
+                }
+            }
+
+            // Enrolled Students
+            async loadEnrolledStudents() {
+                const tbody = document.getElementById('studentsTableBody');
+                tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-500"><div class="animate-spin w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-2"></div>Loading enrolled students directory...</td></tr>`;
+
+                try {
+                    const snapshot = await db.collection('users').get();
+                    this.enrolledStudents = [];
+
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        // Exact filter requirement: user.enrolledBatches && user.enrolledBatches.includes(currentCourseId)
+                        if (data.enrolledBatches && Array.isArray(data.enrolledBatches) && data.enrolledBatches.includes(this.currentCourseId)) {
+                            this.enrolledStudents.push({ id: doc.id, ...data });
+                        }
+                    });
+
+                    document.getElementById('studentCountBadge').textContent = `${this.enrolledStudents.length} Students`;
+
+                    if (this.enrolledStudents.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-500">No students currently enrolled in this batch.</td></tr>`;
+                        return;
+                    }
+
+                    this.renderStudents(this.enrolledStudents);
+
+                } catch (err) {
+                    console.error("Error loading students:", err);
+                    tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-red-400">Failed to load enrolled students.</td></tr>`;
+                }
+            }
+
+            filterStudents() {
+                const q = (document.getElementById('studentSearchInput')?.value || '').toLowerCase().trim();
+                this.renderStudents(this.enrolledStudents.filter(s => [s.name,s.email,s.phone,s.phoneNumber].some(v => String(v || '').toLowerCase().includes(q))));
+            }
+
+            renderStudents(list) {
+                const tbody = document.getElementById('studentsTableBody');
+                if (!list.length) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-500">No matching students found.</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = list.map(s => `
+                        <tr class="hover:bg-slate-900/60 transition">
+                            <td class="p-4 font-semibold text-white flex items-center space-x-2">
+                                <div class="w-7 h-7 rounded-full bg-purple-600/20 text-purple-400 flex items-center justify-center font-bold text-xs border border-purple-500/30">
+                                    ${(s.name || 'S').charAt(0).toUpperCase()}
+                                </div>
+                                <span>${s.name || 'Student'}</span>
+                            </td>
+                            <td class="p-4 text-slate-300">${s.email || 'N/A'}</td>
+                            <td class="p-4 text-slate-300">${s.phone || s.phoneNumber || 'N/A'}</td>
+                            <td class="p-4 text-right">
+                                <a href="tel:${s.phone || s.phoneNumber || ''}" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white rounded-lg transition text-xs border border-purple-500/30">
+                                    <i class="ph-bold ph-phone"></i>
+                                    <span>Call</span>
+                                </a>
+                            </td>
+                        </tr>
+                    `).join('');
+
+            }
+        }
+
+        // Initialize App
+        const app = new TeacherPortal();
+    </script>
+</body>
+</html>
