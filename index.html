@@ -47,6 +47,29 @@
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #334155; }
         .glass-card { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(139, 92, 246, 0.2); }
+        html, body { max-width: 100%; overflow-x: hidden; }
+        button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+        button, a { touch-action: manipulation; }
+        input, select, textarea { max-width: 100%; min-width: 0; }
+        .neon-panel { box-shadow: 0 0 0 1px rgba(139,92,246,.08), 0 12px 35px rgba(2,6,23,.28); }
+        @media (max-width: 640px) {
+            #appContainer main { padding: .75rem !important; }
+            #appContainer header { padding-left: .75rem !important; padding-right: .75rem !important; }
+            #appContainer header .font-bold.text-base { font-size: .82rem; line-height: 1.25rem; }
+            #appContainer header .text-xs { line-height: 1rem; }
+            #viewDashboard > nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; padding: .5rem; }
+            #viewDashboard > nav button { width: 100%; min-height: 44px; padding: .65rem .5rem; line-height: 1.25; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+            #studioTabsContainer { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: .35rem; }
+            #studioTabsContainer button { flex: 0 0 auto; min-height: 42px; padding: .65rem .75rem; }
+            #courseSearchInput { width: 100%; }
+            #dashboardCoursesPanel > .bg-cardBg { padding: 1rem; }
+            #dashboardCoursesPanel > .bg-cardBg > .flex.items-center.space-x-3 { width: 100%; flex-wrap: wrap; }
+            #dashboardCoursesPanel > .bg-cardBg > .flex.items-center.space-x-3 > .relative { flex: 1 1 100%; min-width: 0; }
+            #dashboardCoursesPanel > .bg-cardBg > .flex.items-center.space-x-3 > button { min-height: 40px; }
+            #modalStudentInspector, [role="dialog"] { padding: .5rem !important; }
+            .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+            #batchEnrollmentSearch, #dashPresenceSearch { width: 100%; }
+        }
     </style>
 </head>
 <body class="bg-darkBg text-slate-100 min-h-screen selection:bg-purple-500 selection:text-white flex flex-col justify-between">
@@ -163,6 +186,7 @@
             <div id="viewDashboard" class="space-y-6">
                 <nav class="flex flex-wrap gap-2 p-2 bg-cardBg rounded-2xl border border-slate-800" aria-label="Teacher command navigation">
                     <button id="dashNavCourses" onclick="app.showCommandTab('courses')" class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-purple-600 text-white"><i class="ph-bold ph-books mr-1"></i> Assigned Course Batches</button>
+                    <button id="dashNavEnrollments" onclick="app.showCommandTab('enrollments')" class="hidden px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800"><i class="ph-bold ph-users-three mr-1"></i> Batch Enrollments & Students</button>
                     <button id="dashNavPresence" onclick="app.showCommandTab('presence')" class="hidden px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800"><i class="ph-bold ph-activity mr-1"></i> Active Users & Live Presence</button>
                     <button id="dashNavNotices" onclick="app.showCommandTab('notices')" class="hidden px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800"><i class="ph-bold ph-megaphone mr-1"></i> Batch Notices</button>
                 </nav>
@@ -197,6 +221,14 @@
                     </div>
                 </div>
                 </div>
+                <section id="dashboardEnrollmentsPanel" class="hidden space-y-5">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3"><div><h2 class="text-xl font-bold text-white"><i class="ph-bold ph-users-three text-emerald-300 mr-1"></i> Batch Enrollments & Students</h2><p class="text-sm text-slate-400 mt-1">Live enrollment counts and joined-student directory for your assigned batches.</p></div><div class="px-4 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 text-sm">👥 <span id="enrollmentOverallCount" class="font-bold">0</span> matched enrollments</div></div>
+                    <div id="enrollmentBatchCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                    <div class="rounded-2xl border border-purple-500/25 bg-slate-900/80 overflow-hidden shadow-[0_0_28px_rgba(139,92,246,0.08)]">
+                        <div class="p-4 md:p-5 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-3"><div><h3 id="enrollmentSelectedTitle" class="font-bold text-white text-lg">Select a batch</h3><p class="text-xs text-slate-400 mt-1"><span id="enrollmentSelectedCount">0</span> joined students · live sync</p></div><input id="batchEnrollmentSearch" type="search" oninput="app.renderBatchEnrollmentList()" placeholder="Search name, email or phone…" class="w-full md:max-w-sm px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"></div>
+                        <div id="batchEnrollmentStudentList" class="p-4 space-y-2"><div class="p-6 text-center text-slate-500">Choose an assigned batch above to view enrolled students.</div></div>
+                    </div>
+                </section>
                 <section id="dashboardPresencePanel" class="hidden space-y-5">
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3"><div><h2 class="text-xl font-bold text-white">Active Users & Live Presence</h2><p class="text-sm text-slate-400 mt-1">Live Firestore sync · online students first, then most recently active.</p></div><button onclick="app.loadPresence()" class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button></div>
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -601,6 +633,9 @@
                 this.currentCourseId = null;
                 this.enrolledStudents = [];
                 this.enrolledStudentsUnsubscribe = null;
+                this.enrollmentUsersUnsubscribe = null;
+                this.enrollmentUsers = [];
+                this.selectedEnrollmentBatchId = null;
                 this.courseTests = [];
                 this.teacherStatusUnsubscribe = null;
                 this.presenceUnsubscribe = null;
@@ -636,7 +671,7 @@
                         const parsed = JSON.parse(savedSession);
                         // One-time migration: older portal builds treated missing permission
                         // fields as false. Re-login so the current Firestore record is re-read.
-                        if (parsed.permissionDefaultsVersion !== 3) {
+                        if (parsed.permissionDefaultsVersion !== 4) {
                             localStorage.removeItem('wb_teacher_session');
                         } else {
                             this.teacher = parsed;
@@ -758,12 +793,13 @@
                         canAddNotes: teacherData.canAddNotes !== false,
                         canManageTests: teacherData.canManageTests !== false,
                         canViewStudents: teacherData.canViewStudents === true,
+                        canViewBatchEnrollments: teacherData.canViewBatchEnrollments === true,
                         canViewPresence: teacherData.canViewPresence === true,
                         canInspectUsers: teacherData.canInspectUsers === true,
                         canBlockUsers: teacherData.canBlockUsers === true,
                         canGrantPremium: teacherData.canGrantPremium === true,
                         canPostNotices: teacherData.canPostNotices === true,
-                        permissionDefaultsVersion: 3
+                        permissionDefaultsVersion: 4
                     };
                     localStorage.setItem('wb_teacher_session', JSON.stringify(this.teacher));
                     this.enterDashboard();
@@ -797,7 +833,9 @@
                     const tabStudents = document.getElementById('tabBtnStudents');
                     if (tabStudents) tabStudents.style.display = 'none';
                 }
-                const canPresence = this.teacher.canViewPresence === true || this.teacher.canViewStudents === true;
+                const canEnrollments = this.teacher.canViewBatchEnrollments === true || this.teacher.canViewStudents === true;
+                const canPresence = this.teacher.canViewPresence === true;
+                document.getElementById('dashNavEnrollments')?.classList.toggle('hidden', !canEnrollments);
                 document.getElementById('dashNavPresence')?.classList.toggle('hidden', !canPresence);
                 document.getElementById('dashNavNotices')?.classList.toggle('hidden', this.teacher.canPostNotices !== true);
                 const presenceTab = document.getElementById('tabBtnPresence');
@@ -805,7 +843,12 @@
                 const noticeForm = document.getElementById('noticeForm');
                 if (noticeForm) noticeForm.classList.toggle('hidden', this.teacher.canPostNotices !== true);
                 this.watchTeacherStatus();
-                this.loadCourses().then(() => { if (canPresence) this.showCommandTab('presence'); else this.showCommandTab('courses'); });
+                // Default landing: Presence only when this teacher's online/presence feature is enabled.
+                // Otherwise always open Assigned Course Batches, even if enrollment tracking is available.
+                this.loadCourses().then(() => {
+                    if (this.teacher.canViewPresence === true) this.showCommandTab('presence');
+                    else this.showCommandTab('courses');
+                });
             }
 
             logout() {
@@ -825,6 +868,7 @@
                         if (this.presenceUnsubscribe) this.presenceUnsubscribe();
                         if (this.realtimePresenceUnsubscribe) this.realtimePresenceUnsubscribe();
                         if (this.enrolledStudentsUnsubscribe) this.enrolledStudentsUnsubscribe();
+                        if (this.enrollmentUsersUnsubscribe) this.enrollmentUsersUnsubscribe();
                         if (this.presenceTicker) clearInterval(this.presenceTicker);
                         if (this.noticesUnsubscribe) this.noticesUnsubscribe();
                         localStorage.removeItem('wb_teacher_session');
@@ -894,6 +938,10 @@
                     }
 
                     this.renderCourses(this.courses);
+                    if (this.canSeeBatchEnrollments()) {
+                        this.startBatchEnrollmentListener();
+                        this.renderBatchEnrollmentCards();
+                    }
 
                 } catch (err) {
                     console.error("Error loading courses:", err);
@@ -934,6 +982,7 @@
                             <div class="p-5 space-y-2">
                                 <h3 class="font-bold text-base text-white line-clamp-1 group-hover:text-purple-400 transition">${c.title || 'Untitled Course'}</h3>
                                 <p class="text-xs text-slate-400 line-clamp-2">${c.desc || c.description || 'Comprehensive study curriculum and structured lectures.'}</p>
+                                ${this.canSeeBatchEnrollments() ? `<button onclick="app.openBatchEnrollments('${c.id}')" class="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-400/30 text-emerald-200 text-xs font-semibold hover:bg-emerald-500/20 transition"><i class="ph-bold ph-users-three"></i> 👥 Enrolled Students: <span class="enrollment-count-${this.escapeHtml(c.id)}">${this.getBatchEnrolledUsers(c.id).length}</span></button>` : ''}
                             </div>
                         </div>
                         <div class="p-5 pt-0">
@@ -1043,7 +1092,7 @@
                     if (tabStudents) tabStudents.classList.remove('hidden');
                     this.loadEnrolledStudents();
                 } else if (tabName === 'presence') {
-                    if (this.teacher.canViewPresence !== true && this.teacher.canViewStudents !== true) return this.denied();
+                    if (this.teacher.canViewPresence !== true) return this.denied();
                     if (btnPresence) btnPresence.className = "px-4 py-2 bg-purple-600 text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center space-x-2 whitespace-nowrap";
                     if (tabPresence) tabPresence.classList.remove('hidden');
                     this.loadPresence();
@@ -1604,7 +1653,8 @@
                         this.enrolledStudents = [];
                         snapshot.forEach(doc => {
                             const data = doc.data() || {};
-                            if (Array.isArray(data.enrolledBatches) && data.enrolledBatches.includes(this.currentCourseId)) {
+                            const fields = ['enrolledBatches','allowedCourses','courses','myCourses','enrolledCourses'];
+                            if (fields.some(field => Array.isArray(data[field]) && data[field].map(String).includes(String(this.currentCourseId)))) {
                                 this.enrolledStudents.push({ docId: doc.id, id: doc.id, ...data });
                             }
                         });
@@ -1727,12 +1777,27 @@
 
             friendlyTime(value) {
                 const ms = this.timestampMs(value); if (!ms) return 'Unknown';
-                const delta = Date.now() - ms;
-                if (delta < 60000) return 'Active Now';
-                if (delta < 3600000) return Math.floor(delta / 60000) + ' mins ago';
                 const d = new Date(ms);
-                if (d.toDateString() === new Date().toDateString()) return 'Today at ' + d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
-                return d.toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+                const time12 = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+                if (d.toDateString() === new Date().toDateString()) return 'Today at ' + time12;
+                return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) + ' · ' + time12;
+            }
+
+            friendlyLastSeen(value) {
+                const ms = this.timestampMs(value);
+                if (!ms) return 'No recent activity recorded';
+                const delta = Math.max(0, Date.now() - ms);
+                const d = new Date(ms);
+                const time12 = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+                if (delta < 60000) return `Active just now · ${time12}`;
+                if (delta < 3600000) return `${Math.floor(delta / 60000)} min${Math.floor(delta / 60000) === 1 ? '' : 's'} ago · ${time12}`;
+                if (delta < 12 * 3600000) {
+                    const hours = Math.floor(delta / 3600000);
+                    const mins = Math.floor((delta % 3600000) / 60000);
+                    return `${hours}h${mins ? ` ${mins}m` : ''} ago · ${time12}`;
+                }
+                if (d.toDateString() === new Date().toDateString()) return `Today at ${time12}`;
+                return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) + ` · ${time12}`;
             }
 
             async loadPresence() {
@@ -1767,7 +1832,7 @@
                         this.realtimePresenceUnsubscribe = () => presenceRef.off('value', onValue);
                     }
                     // Refresh relative times and 3-minute online expiry even if no new heartbeat arrives.
-                    if (!this.presenceTicker) this.presenceTicker = setInterval(() => { this.updatePresenceStats(); this.renderPresence(); }, 15000);
+                    if (!this.presenceTicker) this.presenceTicker = setInterval(() => { this.updatePresenceStats(); this.renderPresence(); this.renderBatchEnrollmentList(); }, 15000);
                 } catch (e) {
                     this.presenceListenerStarted = false;
                     if (box) box.innerHTML = `<div class="p-6 text-center text-red-300">Could not start live presence: ${this.escapeHtml(e.message)}</div>`;
@@ -1820,25 +1885,114 @@
                     const lastValue = u.lastSeen || u.lastActive || u.lastActivity || u.updatedAt || this.presenceForUser(u).lastSeen || this.presenceForUser(u).timestamp;
                     return `<div class="presence-student-card flex flex-col md:flex-row md:items-center gap-3 p-4 bg-slate-900/80 border border-slate-800 rounded-xl hover:border-purple-500/40 hover:shadow-[0_0_22px_rgba(139,92,246,0.10)] transition">
                     <div class="relative w-11 h-11 shrink-0 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center text-white font-bold border border-purple-500/20">${u.photoURL || u.photoUrl || u.avatar || u.profile?.photoURL ? `<img class="w-full h-full object-cover" src="${this.safeUrl(u.photoURL || u.photoUrl || u.avatar || u.profile?.photoURL)}" alt="">` : this.escapeHtml(u._displayName.charAt(0).toUpperCase())}<span class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-slate-900 ${u._state.online?'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.95)] animate-pulse':'bg-slate-500'}"></span></div>
-                    <div class="flex-1 min-w-0"><div class="font-semibold text-white break-words">${this.escapeHtml(u._displayName)} <span class="ml-2 inline-flex items-center gap-1 text-[10px] ${u._state.online?'text-emerald-300':'text-slate-400'}">${u._state.online?'<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.9)]"></span> ONLINE NOW':'● OFFLINE'}</span> ${u.blocked?'<span class="ml-1 text-[10px] text-red-300">BLOCKED</span>':''}</div><div class="text-xs text-slate-400 break-all mt-1">${this.escapeHtml(u.email || (String(u.docId||u.id||'').includes('@')?(u.docId||u.id):'No email'))} · ${phone?this.escapeHtml(phone):'No phone'} · ${this.escapeHtml(u._state.online?'Active now':('Last seen: '+this.friendlyTime(lastValue)))}</div></div>
+                    <div class="flex-1 min-w-0"><div class="font-semibold text-white break-words">${this.escapeHtml(u._displayName)} <span class="ml-2 inline-flex items-center gap-1 text-[10px] ${u._state.online?'text-emerald-300':'text-slate-400'}">${u._state.online?'<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.9)]"></span> ONLINE NOW':'● OFFLINE'}</span> ${u.blocked?'<span class="ml-1 text-[10px] text-red-300">BLOCKED</span>':''}</div><div class="text-xs text-slate-400 break-all mt-1">${this.escapeHtml(u.email || (String(u.docId||u.id||'').includes('@')?(u.docId||u.id):'No email'))} · ${phone?this.escapeHtml(phone):'No phone'} · ${this.escapeHtml(u._state.online?'Active now':('Last seen: '+this.friendlyLastSeen(lastValue)))}</div></div>
                     <div class="flex flex-wrap gap-2">${digits?`<a target="_blank" rel="noopener" href="https://wa.me/${digits}" class="px-3 py-2 text-xs rounded-lg bg-emerald-600/10 text-emerald-300 border border-emerald-500/20">WhatsApp</a>`:''}${this.teacher.canInspectUsers===true?`<button onclick="app.inspectStudent('${u.id}')" class="px-3 py-2 text-xs rounded-lg bg-blue-600/15 text-blue-300 border border-blue-500/20">🔍 Inspect Profile</button>`:''}${this.teacher.canBlockUsers===true?`<button onclick="app.toggleStudentBlock('${u.id}')" class="px-3 py-2 text-xs rounded-lg ${u.blocked?'bg-emerald-600/15 text-emerald-300':'bg-red-600/15 text-red-300'} border border-slate-700">${u.blocked?'🟢 Unblock':'🚫 Block / Suspend'}</button>`:''}</div>
                 </div>`;
                 }).join('');
                 targets.forEach(t=>t.innerHTML=html);
             }
 
+            canSeeBatchEnrollments() {
+                return !!this.teacher && this.teacher.canViewBatchEnrollments === true;
+            }
+
+            getBatchEnrolledUsers(batchId) {
+                const fields = ['enrolledBatches','allowedCourses','courses','myCourses','enrolledCourses'];
+                return (this.enrollmentUsers || this.allPresenceUsers || []).filter(user => fields.some(field => Array.isArray(user[field]) && user[field].map(String).includes(String(batchId))));
+            }
+
+            startBatchEnrollmentListener() {
+                if (!this.canSeeBatchEnrollments()) return;
+                if (this.enrollmentUsersUnsubscribe) { this.renderBatchEnrollmentCards(); this.renderBatchEnrollmentList(); return; }
+                const list = document.getElementById('batchEnrollmentStudentList');
+                if (list) list.innerHTML = '<div class="p-6 text-center text-slate-400">Connecting to live enrollment records…</div>';
+                this.enrollmentUsersUnsubscribe = db.collection('users').onSnapshot(snapshot => {
+                    this.enrollmentUsers = [];
+                    snapshot.forEach(doc => this.enrollmentUsers.push({docId:doc.id,id:doc.id,...(doc.data()||{})}));
+                    window.cachedUsers = this.enrollmentUsers;
+                    this.renderBatchEnrollmentCards();
+                    this.renderBatchEnrollmentList();
+                    // If the presence view is also active, keep both views in sync from the same snapshot data.
+                    if (this.teacher.canViewPresence === true) {
+                        this.allPresenceUsers = this.enrollmentUsers;
+                        this.updatePresenceStats();
+                        this.renderPresence();
+                    }
+                }, err => {
+                    console.warn('Live batch enrollment listener error:', err);
+                    if (list) list.innerHTML = `<div class="p-5 text-center text-red-300">Could not sync batch enrollments: ${this.escapeHtml(err.message || 'Permission denied')}</div>`;
+                });
+            }
+
+            openBatchEnrollments(batchId) {
+                if (!this.canSeeBatchEnrollments()) return this.denied();
+                this.selectedEnrollmentBatchId = batchId;
+                this.startBatchEnrollmentListener();
+                this.showCommandTab('enrollments');
+                this.renderBatchEnrollmentCards();
+                this.renderBatchEnrollmentList();
+            }
+
+            renderBatchEnrollmentCards() {
+                if (!this.canSeeBatchEnrollments()) return;
+                const box = document.getElementById('enrollmentBatchCards');
+                if (!box) return;
+                const courses = this.courses || [];
+                box.innerHTML = courses.length ? courses.map(c => {
+                    const count = this.getBatchEnrolledUsers(c.id).length;
+                    const active = String(this.selectedEnrollmentBatchId) === String(c.id);
+                    return `<button onclick="app.openBatchEnrollments('${this.escapeHtml(c.id)}')" class="text-left p-4 rounded-2xl border ${active?'border-emerald-400/60 bg-emerald-500/10':'border-purple-500/20 bg-slate-900/80'} hover:border-emerald-400/50 transition shadow-[0_0_22px_rgba(139,92,246,0.06)]"><div class="text-xs text-slate-400">${this.escapeHtml(c.category||'Assigned Batch')}</div><div class="font-bold text-white mt-1">${this.escapeHtml(c.title||c.name||c.id)}</div><div class="mt-3 inline-flex items-center gap-2 text-sm text-emerald-200"><span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> 👥 <strong>${count}</strong> Enrolled Students</div></button>`;
+                }).join('') : '<div class="col-span-full p-5 rounded-xl bg-slate-900 text-slate-400 text-sm">No assigned batches available.</div>';
+                const allCount = courses.reduce((sum,c)=>sum+this.getBatchEnrolledUsers(c.id).length,0);
+                const overall = document.getElementById('enrollmentOverallCount'); if(overall) overall.textContent=allCount;
+                // Keep course card badges updated on every users snapshot.
+                courses.forEach(c => document.querySelectorAll('.enrollment-count-'+CSS.escape(String(c.id))).forEach(el=>el.textContent=this.getBatchEnrolledUsers(c.id).length));
+                if (!this.selectedEnrollmentBatchId && courses.length) this.selectedEnrollmentBatchId = courses[0].id;
+            }
+
+            renderBatchEnrollmentList() {
+                if (!this.canSeeBatchEnrollments()) return;
+                const list = document.getElementById('batchEnrollmentStudentList');
+                if (!list) return;
+                const batch = this.courses.find(c => String(c.id) === String(this.selectedEnrollmentBatchId));
+                const title = document.getElementById('enrollmentSelectedTitle');
+                if (title) title.textContent = batch ? (batch.title || batch.name || batch.id) : 'Select a batch';
+                if (!batch) { list.innerHTML='<div class="p-6 text-center text-slate-500">Choose an assigned batch above to view enrolled students.</div>'; return; }
+                const students = this.getBatchEnrolledUsers(batch.id);
+                const count = document.getElementById('enrollmentSelectedCount'); if(count) count.textContent=students.length;
+                const q=(document.getElementById('batchEnrollmentSearch')?.value||'').trim().toLowerCase();
+                const filtered=students.map(u=>({...u,_displayName:this.getStudentDisplayName(u),_state:this.presenceState(u)})).filter(u=>!q||[u._displayName,u.email,u.phone,u.phoneNumber,u.whatsapp].some(v=>String(v||'').toLowerCase().includes(q)));
+                filtered.sort((a,b)=>Number(b._state.online)-Number(a._state.online)||b._state.last-a._state.last);
+                if(!filtered.length){list.innerHTML='<div class="p-6 text-center text-slate-500">No enrolled students match this search.</div>';return;}
+                list.innerHTML=filtered.map(u=>{
+                    const phone=u.phone||u.phoneNumber||u.whatsapp||''; const digits=String(phone).replace(/[^0-9]/g,'');
+                    const joined=u.batchJoinedAt?.[batch.id]||u.enrollmentDates?.[batch.id]||u.enrolledAt||u.joinedAt||u.createdAt||u.registeredAt;
+                    const online=u._state.online;
+                    return `<div class="flex flex-col md:flex-row md:items-center gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-purple-500/30 transition"><div class="relative w-11 h-11 shrink-0 rounded-full bg-slate-800 border border-purple-500/20 overflow-hidden flex items-center justify-center text-white font-bold">${u.photoURL||u.photoUrl||u.avatar||u.profile?.photoURL?`<img src="${this.safeUrl(u.photoURL||u.photoUrl||u.avatar||u.profile?.photoURL)}" class="w-full h-full object-cover" alt="">`:this.escapeHtml(u._displayName.charAt(0).toUpperCase())}<span class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-slate-950 ${online?'bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.9)]':'bg-slate-500'}"></span></div><div class="flex-1 min-w-0"><div class="font-semibold text-white break-words">${this.escapeHtml(u._displayName)} <span class="text-[10px] ml-1 ${online?'text-emerald-300':'text-slate-400'}">${online?'🟢 Online Now':'⚪ Offline'}</span> ${u.blocked?'<span class="text-[10px] text-red-300 ml-1">BLOCKED</span>':''}</div><div class="text-xs text-slate-400 break-all mt-1">${this.escapeHtml(u.email||'No email')} · ${this.escapeHtml(phone||'No phone')}</div><div class="text-[11px] text-slate-500 mt-1">Joined: ${this.escapeHtml(this.friendlyTime(joined))}</div></div><div class="flex flex-wrap gap-2">${digits?`<a target="_blank" rel="noopener" href="https://wa.me/${digits}" class="px-3 py-2 text-xs rounded-lg bg-emerald-600/10 text-emerald-300 border border-emerald-500/20">WhatsApp</a>`:''}${this.teacher.canInspectUsers===true?`<button onclick="app.inspectStudent('${this.escapeHtml(u.id)}')" class="px-3 py-2 text-xs rounded-lg bg-blue-600/15 text-blue-300 border border-blue-500/20">🔍 Inspect Profile</button>`:''}</div></div>`;
+                }).join('');
+            }
+
             showCommandTab(tab) {
-                const allowedPresence = this.teacher && (this.teacher.canViewPresence === true || this.teacher.canViewStudents === true);
+                const canEnrollments = this.canSeeBatchEnrollments();
+                const canOpenEnrollmentTab = !!this.teacher && (this.teacher.canViewBatchEnrollments === true || this.teacher.canViewStudents === true);
+                const allowedPresence = this.teacher && this.teacher.canViewPresence === true;
                 if (tab === 'presence' && !allowedPresence) return this.denied();
+                if (tab === 'enrollments' && !canOpenEnrollmentTab) return this.denied();
                 if (tab === 'notices' && this.teacher.canPostNotices !== true) return this.denied();
+                if (!['courses','enrollments','presence','notices'].includes(tab)) tab='courses';
                 this.commandTab = tab;
-                ['courses','presence','notices'].forEach(name=>{
-                    const panel=document.getElementById(name==='courses'?'dashboardCoursesPanel':name==='presence'?'dashboardPresencePanel':'dashboardNoticesPanel');
-                    const button=document.getElementById(name==='courses'?'dashNavCourses':name==='presence'?'dashNavPresence':'dashNavNotices');
+                ['courses','enrollments','presence','notices'].forEach(name=>{
+                    const panelId = {courses:'dashboardCoursesPanel',enrollments:'dashboardEnrollmentsPanel',presence:'dashboardPresencePanel',notices:'dashboardNoticesPanel'}[name];
+                    const buttonId = {courses:'dashNavCourses',enrollments:'dashNavEnrollments',presence:'dashNavPresence',notices:'dashNavNotices'}[name];
+                    const panel=document.getElementById(panelId), button=document.getElementById(buttonId);
                     if(panel) panel.classList.toggle('hidden',name!==tab);
-                    if(button) button.className = `${button.id==='dashNavPresence' && button.classList.contains('hidden')?'hidden ':''}px-4 py-2.5 rounded-xl text-xs font-semibold ${name===tab?'bg-purple-600 text-white':'bg-slate-900 text-slate-300 border border-slate-800'}`;
+                    if(button) {
+                        const shouldHide = (name==='enrollments'&&!canOpenEnrollmentTab)||(name==='presence'&&!allowedPresence)||(name==='notices'&&this.teacher.canPostNotices!==true);
+                        button.className = `${shouldHide?'hidden ':''}px-4 py-2.5 rounded-xl text-xs font-semibold ${name===tab?'bg-purple-600 text-white':'bg-slate-900 text-slate-300 border border-slate-800'}`;
+                    }
                 });
                 if(tab==='presence') this.loadPresence();
+                if(tab==='enrollments') { if (canEnrollments) { this.startBatchEnrollmentListener(); this.renderBatchEnrollmentCards(); this.renderBatchEnrollmentList(); } else { const cards=document.getElementById('enrollmentBatchCards'); const list=document.getElementById('batchEnrollmentStudentList'); if(cards) cards.innerHTML=''; if(list) list.innerHTML='<div class="p-6 text-center rounded-xl border border-amber-500/20 bg-amber-500/5 text-amber-200">Batch enrollment tracking requires the <strong>canViewBatchEnrollments</strong> permission. Ask an administrator to enable it for your account.</div>'; const title=document.getElementById('enrollmentSelectedTitle'); if(title) title.textContent='Enrollment access restricted'; const count=document.getElementById('enrollmentSelectedCount'); if(count) count.textContent='—'; const overall=document.getElementById('enrollmentOverallCount'); if(overall) overall.textContent='—'; } }
                 if(tab==='notices') this.loadNotices();
             }
 
@@ -1890,7 +2044,7 @@
                 const block = this.teacher.canBlockUsers===true ? `<button onclick="app.toggleStudentBlock('${userId}')" class="px-3 py-2 rounded-lg ${u.blocked?'bg-emerald-600/15 text-emerald-300':'bg-red-600/15 text-red-300'} border border-slate-700 text-xs">${u.blocked?'🟢 Unblock Student':'🚫 Block Student'}</button>` : '';
                 const created = u.createdAt || u.registeredAt;
                 document.getElementById('studentInspectorContent').innerHTML = `<div class="flex items-center gap-4"><div class="w-16 h-16 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center text-xl font-bold">${u.photoURL||u.photoUrl||u.avatar?`<img class="w-full h-full object-cover" src="${this.safeUrl(u.photoURL||u.photoUrl||u.avatar)}" alt="">`:this.escapeHtml(this.getStudentDisplayName(u).charAt(0).toUpperCase())}</div><div><h4 class="text-xl font-bold text-white">${this.escapeHtml(this.getStudentDisplayName(u))}</h4><p class="text-sm text-slate-400 break-all">${this.escapeHtml(u.email||'No email')}</p><p class="text-sm text-slate-400">WhatsApp: ${this.escapeHtml(u.phone||u.phoneNumber||u.whatsapp||'Not provided')}</p>${(u.phone||u.phoneNumber||u.whatsapp)?`<a target="_blank" rel="noopener" href="https://wa.me/${String(u.phone||u.phoneNumber||u.whatsapp).replace(/[^0-9]/g,'')}" class="inline-flex mt-2 px-3 py-1.5 rounded-lg bg-emerald-600/15 border border-emerald-500/20 text-emerald-300 text-xs">WhatsApp Chat</a>`:''}</div></div>
-                    <div class="grid sm:grid-cols-2 gap-3"><div class="p-3 rounded-xl bg-slate-900"><div class="text-xs text-slate-400">Platform / Device</div><div class="text-sm text-white mt-1">${this.escapeHtml(u.platform||u.deviceInfo||u.device||u.userAgent||'Not available')}</div></div><div class="p-3 rounded-xl bg-slate-900"><div class="text-xs text-slate-400">Registered</div><div class="text-sm text-white mt-1">${this.escapeHtml(this.friendlyTime(created))}</div></div><div class="p-3 rounded-xl bg-slate-900"><div class="text-xs text-slate-400">Last Seen</div><div class="text-sm text-white mt-1">${this.escapeHtml(this.friendlyTime(u.lastSeen||u.lastActive||u.lastActivity))}</div></div><div class="p-3 rounded-xl bg-slate-900"><div class="text-xs text-slate-400">Account Status</div><div class="text-sm ${u.blocked?'text-red-300':'text-emerald-300'} mt-1">${u.blocked?'🔴 Blocked':'🟢 Active'}${u.blocked&&u.blockedReason?' · '+this.escapeHtml(u.blockedReason):''}</div></div></div>
+                    <div class="grid sm:grid-cols-2 gap-3"><div class="p-3 rounded-xl bg-slate-900"><div class="text-xs text-slate-400">Platform / Device</div><div class="text-sm text-white mt-1">${this.escapeHtml(u.platform||u.deviceInfo||u.device||u.userAgent||'Not available')}</div></div><div class="p-3 rounded-xl bg-slate-900"><div class="text-xs text-slate-400">Registered</div><div class="text-sm text-white mt-1">${this.escapeHtml(this.friendlyTime(created))}</div></div><div class="p-3 rounded-xl bg-slate-900"><div class="text-xs text-slate-400">Last Seen</div><div class="text-sm text-white mt-1">${this.escapeHtml(this.friendlyLastSeen(u.lastSeen||u.lastActive||u.lastActivity))}</div></div><div class="p-3 rounded-xl bg-slate-900"><div class="text-xs text-slate-400">Account Status</div><div class="text-sm ${u.blocked?'text-red-300':'text-emerald-300'} mt-1">${u.blocked?'🔴 Blocked':'🟢 Active'}${u.blocked&&u.blockedReason?' · '+this.escapeHtml(u.blockedReason):''}</div></div></div>
                     <div class="p-4 rounded-xl bg-slate-900 border border-slate-800"><h5 class="font-semibold text-white mb-2">Test Results</h5>${(() => { const results = u.testResults || u.quizResults || u.examResults || u.results || []; const rows = Array.isArray(results) ? results : (results && typeof results === 'object' ? Object.entries(results).map(([name,value])=>({name,...(typeof value==='object'?value:{score:value})})) : []); return rows.length ? `<div class="space-y-2">${rows.slice(0,20).map(r=>`<div class="flex items-center justify-between gap-3 text-xs border-b border-slate-800 pb-2"><span class="text-slate-300">${this.escapeHtml(r.title||r.testName||r.name||r.testId||'Test')}</span><span class="text-emerald-300 font-semibold">${this.escapeHtml(String(r.score ?? r.marks ?? r.percentage ?? r.status ?? 'Submitted'))}</span></div>`).join('')}</div>` : '<p class="text-xs text-slate-500">No test results are stored on this user profile.</p>'; })()}</div>
                     <div><h5 class="font-semibold text-white mb-2">Enrolled Course Batches</h5><div class="flex flex-wrap gap-2">${batchTags||'<span class="text-sm text-slate-500">No enrolled batches</span>'}</div>${grant}</div><div class="flex flex-wrap gap-2">${block}</div>`;
                 this.openModal('modalStudentInspector');
